@@ -42,6 +42,7 @@ The package works out-of-the-box, but you can customize the behavior:
 
 ```php
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 use UserDevices\DeviceCreator;
@@ -65,10 +66,15 @@ class AppServiceProvider extends ServiceProvider
 
         // Customize the notification email
         NewLoginDeviceNotification::toMailUsing(function ($notifiable, $device) {
+            $expire = Config::get('auth.verification.expire', 60);
+
             $blockUrl = URL::temporarySignedRoute(
-                'user-devices.block',
-                now()->addMinutes(Config::get('auth.verification.expire', 60)),
-                ['id' => $device->getKey(), 'hash' => sha1($device->getKey())],
+                name: 'user-devices.block',
+                expiration: Carbon::now()->addMinutes($expire),
+                parameters: [
+                    'id' => $device->getKey(),
+                    'hash' => sha1($device->getKey()),
+                ],
             );
 
             return (new MailMessage)
@@ -80,12 +86,12 @@ class AppServiceProvider extends ServiceProvider
         // Customize the block device URL
         NewLoginDeviceNotification::createBlockUrlUsing(function ($device) {
             return URL::temporarySignedRoute(
-                'your-custom-route-name',
-                now()->addMinutes(120),
-                [
+                name: 'your-custom-route-name',
+                expiration: Carbon::now()->addMinutes(120),
+                parameters: [
                     'id' => $device->getKey(),
                     'hash' => sha1($device->getKey()),
-                ]
+                ],
             );
         });
     }

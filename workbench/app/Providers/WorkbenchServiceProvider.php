@@ -5,6 +5,7 @@ namespace Workbench\App\Providers;
 use Illuminate\Support\ServiceProvider;
 use UserDevices\DeviceCreator;
 use Workbench\App\Models\User;
+use Workbench\App\Models\UserDevice;
 
 class WorkbenchServiceProvider extends ServiceProvider
 {
@@ -22,5 +23,7 @@ class WorkbenchServiceProvider extends ServiceProvider
     public function boot(): void
     {
         DeviceCreator::useUserModel(User::class);
+
+        DeviceCreator::useUserDeviceModel(UserDevice::class);
     }
 }

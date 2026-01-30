@@ -4,8 +4,8 @@ namespace Workbench\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
-use UserDevices\Models\UserDevice;
 use Workbench\App\Models\User;
+use Workbench\App\Models\UserDevice;
 
 class UserDeviceFactory extends Factory
 {

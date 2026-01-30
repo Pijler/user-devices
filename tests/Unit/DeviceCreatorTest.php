@@ -1,14 +1,8 @@
 <?php
 
 use UserDevices\DeviceCreator;
-use UserDevices\Models\UserDevice;
 use Workbench\App\Models\User;
-
-beforeEach(function () {
-    DeviceCreator::$userAgent = null;
-    DeviceCreator::$userModel = User::class;
-    DeviceCreator::$userDeviceModel = UserDevice::class;
-});
+use Workbench\App\Models\UserDevice;
 
 test('it should have default user model', function () {
     expect(DeviceCreator::$userModel)->toBe(User::class);

@@ -1,14 +1,11 @@
 <?php
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Notification;
 use UserDevices\DeviceCreator;
-use UserDevices\Models\UserDevice;
+use UserDevices\Notifications\NewLoginDeviceNotification;
 use Workbench\App\Models\User;
-
-beforeEach(function () {
-    DeviceCreator::$userModel = User::class;
-    DeviceCreator::$userDeviceModel = UserDevice::class;
-});
+use Workbench\App\Models\UserDevice;
 
 test('it should return hasMany relationship for user devices', function () {
     $user = User::factory()->create();
@@ -29,12 +26,12 @@ test('it should use custom user device model for userDevices relationship', func
 });
 
 test('it should send new login device notification', function () {
-    \Illuminate\Support\Facades\Notification::fake();
+    Notification::fake();
 
     $user = User::factory()->create();
     $device = UserDevice::factory()->create(['user_id' => $user->id]);
 
     $user->sendNewLoginDeviceNotification($device);
 
-    \Illuminate\Support\Facades\Notification::assertSentTo($user, \UserDevices\Notifications\NewLoginDeviceNotification::class);
+    Notification::assertSentTo($user, NewLoginDeviceNotification::class);
 });

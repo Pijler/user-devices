@@ -2,12 +2,16 @@
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
-use UserDevices\Models\UserDevice;
 use Workbench\App\Models\User;
+use Workbench\App\Models\UserDevice;
 
 test('it should block device when accessing signed URL', function () {
     $user = User::factory()->create();
-    $device = UserDevice::factory()->create(['user_id' => $user->id, 'blocked' => false]);
+
+    $device = UserDevice::factory()->create([
+        'blocked' => false,
+        'user_id' => $user->id,
+    ]);
 
     $url = URL::temporarySignedRoute(
         'user-devices.block',
@@ -26,6 +30,7 @@ test('it should block device when accessing signed URL', function () {
 
 test('it should return 403 when hash is invalid', function () {
     $user = User::factory()->create();
+
     $device = UserDevice::factory()->create(['user_id' => $user->id]);
 
     $url = URL::temporarySignedRoute(
@@ -45,6 +50,7 @@ test('it should return 403 when hash is invalid', function () {
 
 test('it should return 403 when signature is invalid', function () {
     $user = User::factory()->create();
+
     $device = UserDevice::factory()->create(['user_id' => $user->id]);
 
     $url = route('user-devices.block', [
@@ -59,10 +65,11 @@ test('it should return 403 when signature is invalid', function () {
 
 test('it should access dashboard when device is not blocked', function () {
     $user = User::factory()->create();
+
     UserDevice::factory()->create([
+        'blocked' => false,
         'user_id' => $user->id,
         'user_agent' => 'Mozilla/5.0 Test Browser',
-        'blocked' => false,
     ]);
 
     $response = $this->actingAs($user)
@@ -75,10 +82,11 @@ test('it should access dashboard when device is not blocked', function () {
 
 test('it should return 423 when device is blocked', function () {
     $user = User::factory()->create();
+
     UserDevice::factory()->create([
+        'blocked' => true,
         'user_id' => $user->id,
         'user_agent' => 'Mozilla/5.0 Blocked Browser',
-        'blocked' => true,
     ]);
 
     $response = $this->actingAs($user)

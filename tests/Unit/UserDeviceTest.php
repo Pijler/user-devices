@@ -1,14 +1,7 @@
 <?php
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use UserDevices\DeviceCreator;
-use UserDevices\Models\UserDevice;
-use Workbench\App\Models\User;
-
-beforeEach(function () {
-    DeviceCreator::$userModel = User::class;
-    DeviceCreator::$userDeviceModel = UserDevice::class;
-});
+use Workbench\App\Models\UserDevice;
 
 test('it should have correct guarded attributes', function () {
     $model = new UserDevice;
@@ -18,6 +11,7 @@ test('it should have correct guarded attributes', function () {
 
 test('it should have correct casts', function () {
     $model = new UserDevice;
+
     $casts = $model->getCasts();
 
     expect($casts)->toHaveKey('blocked', 'boolean');

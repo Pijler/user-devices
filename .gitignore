@@ -7,3 +7,4 @@ auth.json
 /.fleet
 /.idea
 /.vscode
+/workbench/storage/logs

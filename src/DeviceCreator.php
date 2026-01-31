@@ -3,8 +3,7 @@
 namespace UserDevices;
 
 use Closure;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Request;
+use Illuminate\Support\Facades\Context;
 use UserDevices\Models\UserDevice;
 
 class DeviceCreator
@@ -34,6 +33,17 @@ class DeviceCreator
     public static string $userDeviceModel = UserDevice::class;
 
     /**
+     * Add a flag to the request context to ignore the new login device notification.
+     *
+     * Call this before authentication (e.g. in middleware or controller) when you
+     * want to save the device but skip sending the notification email.
+     */
+    public static function ignoreNotification(): void
+    {
+        Context::add('user_devices.ignore_notification', true);
+    }
+
+    /**
      * Specify a custom user model class.
      */
     public static function useUserModel(string $model): void
@@ -55,28 +65,5 @@ class DeviceCreator
     public static function useUserDeviceModel(string $model): void
     {
         static::$userDeviceModel = $model;
-    }
-
-    /**
-     * Save a new user device.
-     */
-    public static function saveUserDevice(bool $ignoreNotification = false): void
-    {
-        $user = Request::user();
-
-        $device = $user->userDevices()->firstOrNew([
-            'ip_address' => Request::ip(),
-            'user_agent' => with(Request::userAgent(), static::$userAgent),
-        ]);
-
-        tap($device->exists, function ($exists) use ($user, $device, $ignoreNotification) {
-            $device->fill([
-                'last_activity' => Carbon::now()->timestamp,
-            ])->save();
-
-            if (! $exists && ! $ignoreNotification) {
-                $user->sendNewLoginDeviceNotification($device);
-            }
-        });
     }
 }

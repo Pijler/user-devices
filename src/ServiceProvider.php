@@ -2,8 +2,11 @@
 
 namespace UserDevices;
 
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider as LaravelServiceProvider;
+use UserDevices\Listeners\SaveUserDevice;
 use UserDevices\Middleware\CheckCurrentDevice;
 
 class ServiceProvider extends LaravelServiceProvider
@@ -16,6 +19,16 @@ class ServiceProvider extends LaravelServiceProvider
         $this->bootMigrations();
 
         $this->bootMiddleware();
+
+        $this->bootEventListeners();
+    }
+
+    /**
+     * Register the package event listeners.
+     */
+    private function bootEventListeners(): void
+    {
+        Event::listen(Authenticated::class, SaveUserDevice::class);
     }
 
     /**

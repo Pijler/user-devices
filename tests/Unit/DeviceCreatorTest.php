@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Context;
 use UserDevices\DeviceCreator;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
@@ -38,4 +39,10 @@ test('it should set user agent callback correctly', function () {
     DeviceCreator::userAgentUsing($callback);
 
     expect(DeviceCreator::$userAgent)->toBe($callback);
+});
+
+test('it should add ignore notification flag to context', function () {
+    DeviceCreator::ignoreNotification();
+
+    expect(Context::get('user_devices.ignore_notification'))->toBeTrue();
 });

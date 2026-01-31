@@ -1,9 +1,49 @@
 <?php
 
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
+use UserDevices\DeviceCreator;
+use UserDevices\Notifications\NewLoginDeviceNotification;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
+
+test('it should save user device when authenticated', function () {
+    $user = User::factory()->create();
+
+    expect($user->userDevices)->toHaveCount(0);
+
+    $this->actingAs($user)->get('/dashboard');
+
+    $user->refresh();
+    expect($user->userDevices)->toHaveCount(1);
+});
+
+test('it should not send notification when ignoreNotification is called via context', function () {
+    Notification::fake();
+
+    $user = User::factory()->create();
+
+    DeviceCreator::ignoreNotification();
+
+    $this->actingAs($user)
+        ->withHeader('User-Agent', 'Mozilla/5.0 Silent Device Browser')
+        ->get('/dashboard');
+
+    Notification::assertNothingSent();
+});
+
+test('it should send notification for new device when context is not set', function () {
+    Notification::fake();
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->withHeader('User-Agent', 'Mozilla/5.0 Brand New Device')
+        ->get('/dashboard');
+
+    Notification::assertSentTo($user, NewLoginDeviceNotification::class);
+});
 
 test('it should block device when accessing signed URL', function () {
     $user = User::factory()->create();

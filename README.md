@@ -180,7 +180,7 @@ The package includes middleware to block requests from devices the user has bloc
 // routes/web.php
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'check-device'])->group(function () {
+Route::middleware(['auth', 'check.device'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
 });
 ```

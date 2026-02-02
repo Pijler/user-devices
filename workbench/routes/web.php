@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use UserDevices\Http\Requests\BlockDeviceRequest;
 
-Route::middleware(['auth', 'check-device'])->group(function () {
+Route::middleware(['auth', 'check.device'])->group(function () {
     Route::get('/dashboard', function () {
         return response()->json(['message' => 'Access granted']);
     });

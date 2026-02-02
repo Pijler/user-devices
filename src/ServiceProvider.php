@@ -52,6 +52,6 @@ class ServiceProvider extends LaravelServiceProvider
         /** @var Router $router */
         $router = $this->app->make(Router::class);
 
-        $router->aliasMiddleware('check-device', CheckCurrentDevice::class);
+        $router->aliasMiddleware('check.device', CheckCurrentDevice::class);
     }
 }

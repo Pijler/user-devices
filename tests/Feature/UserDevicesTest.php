@@ -45,6 +45,38 @@ test('it should send notification for new device when context is not set', funct
     Notification::assertSentTo($user, NewLoginDeviceNotification::class);
 });
 
+test('it should not send notification when shouldSendNotificationUsing returns false', function () {
+    Notification::fake();
+
+    $user = User::factory()->create();
+
+    DeviceCreator::shouldSendNotificationUsing(fn () => false);
+
+    $this->actingAs($user)
+        ->withHeader('User-Agent', 'Mozilla/5.0 Yet Another New Device')
+        ->get('/dashboard');
+
+    Notification::assertNothingSent();
+
+    DeviceCreator::$shouldSendNotification = null;
+});
+
+test('it should send notification when shouldSendNotificationUsing returns true', function () {
+    Notification::fake();
+
+    $user = User::factory()->create();
+
+    DeviceCreator::shouldSendNotificationUsing(fn () => true);
+
+    $this->actingAs($user)
+        ->withHeader('User-Agent', 'Mozilla/5.0 Custom Callback Device')
+        ->get('/dashboard');
+
+    Notification::assertSentTo($user, NewLoginDeviceNotification::class);
+
+    DeviceCreator::$shouldSendNotification = null;
+});
+
 test('it should block device when accessing signed URL', function () {
     $user = User::factory()->create();
 

@@ -25,6 +25,15 @@ class DeviceCreator
     public static string $userModel = 'App\\Models\\User';
 
     /**
+     * A custom callback to determine whether to send the new login device notification.
+     *
+     * When set, this closure receives the user and device and returns a boolean.
+     * If it returns false, the notification is not sent. When null, notifications
+     * are sent by default (unless ignoreNotification() was called for the request).
+     */
+    public static ?Closure $shouldSendNotification = null;
+
+    /**
      * The fully qualified class name of the user device model.
      *
      * This model is responsible for persisting and managing user devices
@@ -65,5 +74,15 @@ class DeviceCreator
     public static function useUserDeviceModel(string $model): void
     {
         static::$userDeviceModel = $model;
+    }
+
+    /**
+     * Set a callback to determine whether to send the new login device notification.
+     *
+     * The callback receives the user and device as arguments and should return a boolean.
+     */
+    public static function shouldSendNotificationUsing(Closure $callback): void
+    {
+        static::$shouldSendNotification = $callback;
     }
 }

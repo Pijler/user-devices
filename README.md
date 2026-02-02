@@ -64,6 +64,11 @@ class AppServiceProvider extends ServiceProvider
         // Customize user agent generation
         DeviceCreator::userAgentUsing(fn ($userAgent) => substr($userAgent, 0, 255));
 
+        // Control when to send new login notifications (e.g. disable in local/staging)
+        DeviceCreator::shouldSendNotificationUsing(function ($user, $device) {
+            return ! app()->environment('local');
+        });
+
         // Customize the notification email
         NewLoginDeviceNotification::toMailUsing(function ($notifiable, $device) {
             $expire = Config::get('auth.verification.expire', 60);
@@ -130,11 +135,26 @@ use UserDevices\DeviceCreator;
 DeviceCreator::ignoreNotification();
 ```
 
+To control notifications globally (e.g. disable in local/staging, or custom logic per user/device):
+
+```php
+use UserDevices\DeviceCreator;
+
+// Disable notifications entirely
+DeviceCreator::shouldSendNotificationUsing(fn () => false);
+
+// Custom logic (e.g. skip for admins)
+DeviceCreator::shouldSendNotificationUsing(fn ($user, $device) => ! $user->isAdmin());
+
+// Only send in production
+DeviceCreator::shouldSendNotificationUsing(fn ($user, $device) => app()->environment('production'));
+```
+
 This will:
 
 - Create or update the device record (IP + user agent)
 - Update last activity timestamp
-- Send a notification email on **first login** from that device (unless `ignoreNotification()` was called)
+- Send a notification email on **first login** from that device (unless `ignoreNotification()` was called or `shouldSendNotificationUsing()` returns false)
 
 #### 3. Block Device Route
 
@@ -204,6 +224,7 @@ $user->sendNewLoginDeviceNotification($device);
 DeviceCreator::useUserModel(string $model): void
 DeviceCreator::useUserDeviceModel(string $model): void
 DeviceCreator::userAgentUsing(Closure $callback): void
+DeviceCreator::shouldSendNotificationUsing(Closure $callback): void  // (user, device) => bool
 
 // Methods
 DeviceCreator::ignoreNotification(): void  // Add to Context to skip notification for current request

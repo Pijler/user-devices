@@ -46,3 +46,13 @@ test('it should add ignore notification flag to context', function () {
 
     expect(Context::get('user_devices.ignore_notification'))->toBeTrue();
 });
+
+test('it should set should send notification callback correctly', function () {
+    $callback = fn () => true;
+
+    DeviceCreator::shouldSendNotificationUsing($callback);
+
+    expect(DeviceCreator::$shouldSendNotification)->toBe($callback);
+
+    DeviceCreator::$shouldSendNotification = null;
+});

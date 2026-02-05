@@ -41,6 +41,12 @@ test('it should set user agent callback correctly', function () {
     expect(DeviceCreator::$userAgent)->toBe($callback);
 });
 
+test('it should add ignore listener flag to context', function () {
+    DeviceCreator::ignoreListener();
+
+    expect(Context::get('user_devices.ignore_listener'))->toBeTrue();
+});
+
 test('it should add ignore notification flag to context', function () {
     DeviceCreator::ignoreNotification();
 

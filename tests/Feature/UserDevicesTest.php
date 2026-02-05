@@ -19,6 +19,19 @@ test('it should save user device when authenticated', function () {
     expect($user->userDevices)->toHaveCount(1);
 });
 
+test('it should not save user device when ignoreListener is called via context', function () {
+    $user = User::factory()->create();
+
+    expect($user->userDevices)->toHaveCount(0);
+
+    DeviceCreator::ignoreListener();
+
+    $this->actingAs($user)->get('/dashboard');
+
+    $user->refresh();
+    expect($user->userDevices)->toHaveCount(0);
+});
+
 test('it should not send notification when ignoreNotification is called via context', function () {
     Notification::fake();
 

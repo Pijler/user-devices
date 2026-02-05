@@ -2,7 +2,7 @@
 
 namespace UserDevices\Listeners;
 
-use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Request;
@@ -13,9 +13,9 @@ use UserDevices\Traits\HasUserDevices;
 class SaveUserDevice
 {
     /**
-     * Handle the event.
+     * Handle the event. Creates or updates the device on login and sends the new device notification when applicable.
      */
-    public function handle(Authenticated $event): void
+    public function handle(Login $event): void
     {
         /** @var mixed $user */
         $user = $event->user;
@@ -28,22 +28,16 @@ class SaveUserDevice
             return;
         }
 
-        $device = $user->userDevices()->firstOrNew([
+        $device = $user->userDevices()->firstOrCreate([
             'ip_address' => Request::ip(),
             'user_agent' => with(Request::userAgent(), DeviceCreator::$userAgent),
-        ]);
+        ], ['last_activity' => Carbon::now()->timestamp]);
 
-        tap($device->exists, function ($exists) use ($user, $device) {
-            $device->fill([
-                'last_activity' => Carbon::now()->timestamp,
-            ])->save();
+        $shouldSend = $this->shouldSendNotification($user, $device);
 
-            $shouldSend = $this->shouldSendNotification($user, $device);
-
-            if (! $exists && $shouldSend) {
-                $user->sendNewLoginDeviceNotification($device);
-            }
-        });
+        if ($shouldSend && $device->wasRecentlyCreated) {
+            $user->sendNewLoginDeviceNotification($device);
+        }
     }
 
     /**

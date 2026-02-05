@@ -124,7 +124,12 @@ class User extends Authenticatable
 
 #### 2. Saving User Devices
 
-The package automatically saves user devices when the `Authenticated` event is fired (on every authenticated request). No manual setup required—just add the `HasUserDevices` trait to your User model.
+The package uses two events so that new devices are tracked on **login** (e.g. avoiding impersonation) while **last activity** is updated on every authenticated request:
+
+- **Login**: Creates or updates the device (IP + user agent), sets `last_activity`, and sends the "new device" email when it's the first time from that device.
+- **Authenticated**: Only updates `last_activity` for the current device (no new records, no notifications). Keeps "last seen" accurate across requests.
+
+No manual setup required—just add the `HasUserDevices` trait to your User model.
 
 To skip saving the device entirely for a request (e.g. in middleware or controller before authentication):
 
@@ -159,11 +164,10 @@ DeviceCreator::shouldSendNotificationUsing(fn ($user, $device) => ! $user->isAdm
 DeviceCreator::shouldSendNotificationUsing(fn ($user, $device) => app()->environment('production'));
 ```
 
-This will:
+Result:
 
-- Create or update the device record (IP + user agent)
-- Update last activity timestamp
-- Send a notification email on **first login** from that device (unless `ignoreListener()` was called, or `ignoreNotification()` was called, or `shouldSendNotificationUsing()` returns false)
+- **On login**: The device record is created or updated (IP + user agent), `last_activity` is set, and a notification email is sent on **first login** from that device (unless `ignoreListener()` was called, or `ignoreNotification()` was called, or `shouldSendNotificationUsing()` returns false).
+- **On each authenticated request**: The existing device's `last_activity` is updated (so "last seen" stays current). Call `DeviceCreator::ignoreListener()` before impersonation (e.g. `onceUsingId`) to skip this for that request.
 
 #### 3. Block Device Route
 

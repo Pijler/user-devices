@@ -2,18 +2,19 @@
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\URL;
 use UserDevices\DeviceCreator;
 use UserDevices\Notifications\NewLoginDeviceNotification;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
 
-test('it should save user device when authenticated', function () {
+test('it should save user device on login', function () {
     $user = User::factory()->create();
 
     expect($user->userDevices)->toHaveCount(0);
 
-    $this->actingAs($user)->get('/dashboard');
+    $this->login($user)->get('/dashboard');
 
     $user->refresh();
     expect($user->userDevices)->toHaveCount(1);
@@ -26,7 +27,7 @@ test('it should not save user device when ignoreListener is called via context',
 
     DeviceCreator::ignoreListener();
 
-    $this->actingAs($user)->get('/dashboard');
+    $this->login($user)->get('/dashboard');
 
     $user->refresh();
     expect($user->userDevices)->toHaveCount(0);
@@ -39,9 +40,7 @@ test('it should not send notification when ignoreNotification is called via cont
 
     DeviceCreator::ignoreNotification();
 
-    $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Silent Device Browser')
-        ->get('/dashboard');
+    $this->login($user)->get('/dashboard');
 
     Notification::assertNothingSent();
 });
@@ -51,9 +50,7 @@ test('it should send notification for new device when context is not set', funct
 
     $user = User::factory()->create();
 
-    $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Brand New Device')
-        ->get('/dashboard');
+    $this->login($user)->get('/dashboard');
 
     Notification::assertSentTo($user, NewLoginDeviceNotification::class);
 });
@@ -65,9 +62,7 @@ test('it should not send notification when shouldSendNotificationUsing returns f
 
     DeviceCreator::shouldSendNotificationUsing(fn () => false);
 
-    $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Yet Another New Device')
-        ->get('/dashboard');
+    $this->login($user)->get('/dashboard');
 
     Notification::assertNothingSent();
 
@@ -81,13 +76,36 @@ test('it should send notification when shouldSendNotificationUsing returns true'
 
     DeviceCreator::shouldSendNotificationUsing(fn () => true);
 
-    $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Custom Callback Device')
-        ->get('/dashboard');
+    $this->login($user)->get('/dashboard');
 
     Notification::assertSentTo($user, NewLoginDeviceNotification::class);
 
     DeviceCreator::$shouldSendNotification = null;
+});
+
+test('it should update last_activity on authenticated requests', function () {
+    $user = User::factory()->create();
+    $userAgent = 'Mozilla/5.0 Activity Browser';
+
+    $request = Request::instance();
+    $request->headers->set('User-Agent', $userAgent);
+
+    $this->login($user);
+
+    $device = $user->userDevices()->first();
+    $oldActivity = $device->last_activity;
+
+    Carbon::setTestNow(Carbon::now()->addSeconds(10));
+
+    $this->actingAs($user)
+        ->withHeader('User-Agent', $userAgent)
+        ->get('/dashboard');
+
+    $newActivity = $device->fresh()->last_activity;
+
+    expect($newActivity)->toBeGreaterThan($oldActivity);
+
+    Carbon::setTestNow();
 });
 
 test('it should block device when accessing signed URL', function () {

@@ -3,10 +3,12 @@
 namespace UserDevices;
 
 use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider as LaravelServiceProvider;
 use UserDevices\Listeners\SaveUserDevice;
+use UserDevices\Listeners\UpdateDeviceLastActivity;
 use UserDevices\Middleware\CheckCurrentDevice;
 
 class ServiceProvider extends LaravelServiceProvider
@@ -28,7 +30,9 @@ class ServiceProvider extends LaravelServiceProvider
      */
     private function bootEventListeners(): void
     {
-        Event::listen(Authenticated::class, SaveUserDevice::class);
+        Event::listen(Login::class, SaveUserDevice::class);
+
+        Event::listen(Authenticated::class, UpdateDeviceLastActivity::class);
     }
 
     /**

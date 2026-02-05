@@ -126,12 +126,12 @@ class User extends Authenticatable
 
 The package automatically saves user devices when the `Authenticated` event is fired (on every authenticated request). No manual setup required—just add the `HasUserDevices` trait to your User model.
 
-To skip saving the device entirely for a request (e.g. in middleware or controller before authentication):
+To skip saving the device entirely for a request (e.g. in middleware or controller before authentication, or before impersonation such as `onceUsingId`):
 
 ```php
 use UserDevices\DeviceCreator;
 
-// In middleware or controller—call before the user is authenticated
+// Call before the user is authenticated for this request
 DeviceCreator::ignoreListener();
 ```
 
@@ -140,7 +140,7 @@ To ignore only the new login notification (device is still saved, but no email i
 ```php
 use UserDevices\DeviceCreator;
 
-// In middleware or controller—call before the user is authenticated
+// Call before the user is authenticated for this request
 DeviceCreator::ignoreNotification();
 ```
 

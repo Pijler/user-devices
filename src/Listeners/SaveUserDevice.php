@@ -13,7 +13,7 @@ use UserDevices\Traits\HasUserDevices;
 class SaveUserDevice
 {
     /**
-     * Handle the event.
+     * Handle the event. Skips when DeviceCreator::ignoreListener() was called for the current request.
      */
     public function handle(Authenticated $event): void
     {

@@ -42,6 +42,17 @@ class DeviceCreator
     public static string $userDeviceModel = UserDevice::class;
 
     /**
+     * Add a flag to the request context so the new login device listener is skipped.
+     *
+     * Call this before authentication (e.g. in middleware or controller) when you
+     * want to skip saving the device for this request.
+     */
+    public static function ignoreListener(): void
+    {
+        Context::add('user_devices.ignore_listener', true);
+    }
+
+    /**
      * Add a flag to the request context to ignore the new login device notification.
      *
      * Call this before authentication (e.g. in middleware or controller) when you

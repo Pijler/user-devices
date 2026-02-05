@@ -126,7 +126,16 @@ class User extends Authenticatable
 
 The package automatically saves user devices when the `Authenticated` event is fired (on every authenticated request). No manual setup required—just add the `HasUserDevices` trait to your User model.
 
-To ignore the new login notification via request context (e.g. in middleware or controller before authentication):
+To skip saving the device entirely for a request (e.g. in middleware or controller before authentication):
+
+```php
+use UserDevices\DeviceCreator;
+
+// In middleware or controller—call before the user is authenticated
+DeviceCreator::ignoreListener();
+```
+
+To ignore only the new login notification (device is still saved, but no email is sent):
 
 ```php
 use UserDevices\DeviceCreator;
@@ -154,7 +163,7 @@ This will:
 
 - Create or update the device record (IP + user agent)
 - Update last activity timestamp
-- Send a notification email on **first login** from that device (unless `ignoreNotification()` was called or `shouldSendNotificationUsing()` returns false)
+- Send a notification email on **first login** from that device (unless `ignoreListener()` was called, or `ignoreNotification()` was called, or `shouldSendNotificationUsing()` returns false)
 
 #### 3. Block Device Route
 
@@ -226,8 +235,9 @@ DeviceCreator::useUserDeviceModel(string $model): void
 DeviceCreator::userAgentUsing(Closure $callback): void
 DeviceCreator::shouldSendNotificationUsing(Closure $callback): void  // (user, device) => bool
 
-// Methods
-DeviceCreator::ignoreNotification(): void  // Add to Context to skip notification for current request
+// Request context (call before authentication)
+DeviceCreator::ignoreListener(): void     // Skip saving the device for the current request
+DeviceCreator::ignoreNotification(): void // Skip the new login notification for the current request
 ```
 
 #### UserDevice Model

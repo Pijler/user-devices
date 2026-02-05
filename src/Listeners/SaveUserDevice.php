@@ -20,6 +20,10 @@ class SaveUserDevice
         /** @var mixed $user */
         $user = $event->user;
 
+        if (Context::get('user_devices.ignore_listener', false)) {
+            return;
+        }
+
         if (! in_array(HasUserDevices::class, class_uses_recursive($user))) {
             return;
         }

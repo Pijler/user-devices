@@ -94,19 +94,19 @@ class AuthenticatedLoginNotification extends Notification
     {
         $parts = [];
 
-        if ($this->device->ip_address) {
+        if (filled($this->device->ip_address)) {
             $parts[] = Lang::get('IP Address: :ip', ['ip' => $this->device->ip_address]);
         }
 
-        if ($this->device->user_agent) {
+        if (filled($this->device->user_agent)) {
             $parts[] = Lang::get('Device: :device', ['device' => $this->device->user_agent]);
         }
 
-        if ($this->device->location) {
+        if (filled($this->device->location)) {
             $parts[] = Lang::get('Location: :location', ['location' => $this->device->location]);
         }
 
-        return ! empty($parts) ? implode(' | ', $parts) : Lang::get('Unknown device');
+        return filled($parts) ? implode(' | ', $parts) : Lang::get('Unknown device');
     }
 
     /**

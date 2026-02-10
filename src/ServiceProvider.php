@@ -80,7 +80,7 @@ class ServiceProvider extends LaravelServiceProvider
         Event::listen(Failed::class, FailedLoginListener::class);
 
         Event::listen(Attempting::class, AttemptingLoginListener::class);
-        
+
         Event::listen(Authenticated::class, AuthenticatedLoginListener::class);
     }
 }

@@ -4,6 +4,7 @@ namespace UserDevices\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 use UserDevices\DeviceCreator;
 use UserDevices\Models\UserDevice;
 
@@ -35,11 +36,19 @@ class BlockDeviceRequest extends FormRequest
     {
         $this->getDevice()?->block();
 
-        $sessionId = $this->getDevice()?->session_id;
+        rescue(function () {
+            $user = $this->getDevice()?->user;
 
-        if (filled($sessionId)) {
-            Session::getHandler()->destroy($sessionId);
-        }
+            $sessionId = $this->getDevice()?->session_id;
+
+            if (filled($user) && filled($sessionId)) {
+                Session::getHandler()->destroy($sessionId);
+
+                // Cycle remember token so the blocked device
+                // cannot re-authenticate via remember me cookie
+                tap($user, fn ($user) => $user->setRememberToken(Str::random(60)))->save();
+            }
+        });
     }
 
     /**

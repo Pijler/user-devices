@@ -14,8 +14,10 @@ return new class extends Migration
         Schema::create('user_devices', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignId('user_id')->constrained()->onUpdate('cascade')->onDelete('cascade');
+            $table->string('session_id')->nullable();
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
+            $table->string('location')->nullable();
             $table->integer('last_activity')->index();
             $table->boolean('blocked')->default(false);
             $table->timestamps();

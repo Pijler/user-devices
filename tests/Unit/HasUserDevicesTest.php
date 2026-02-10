@@ -3,7 +3,7 @@
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Notification;
 use UserDevices\DeviceCreator;
-use UserDevices\Notifications\NewLoginDeviceNotification;
+use UserDevices\Notifications\AuthenticatedLoginNotification;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
 
@@ -31,7 +31,7 @@ test('it should send new login device notification', function () {
     $user = User::factory()->create();
     $device = UserDevice::factory()->create(['user_id' => $user->id]);
 
-    $user->sendNewLoginDeviceNotification($device);
+    $user->sendAuthenticatedLoginNotification($device);
 
-    Notification::assertSentTo($user, NewLoginDeviceNotification::class);
+    Notification::assertSentTo($user, AuthenticatedLoginNotification::class);
 });

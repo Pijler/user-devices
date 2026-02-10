@@ -17,6 +17,15 @@ class DeviceCreator
     public static ?Closure $userAgent = null;
 
     /**
+     * A callback to resolve location (city, country, etc.) from an IP address.
+     *
+     * Return null if the location cannot be determined. Use resolveLocationUsing()
+     * to configure. Example with torann/geoip:
+     * DeviceCreator::resolveLocationUsing(fn (string $ip) => geoip($ip)->city ?? geoip($ip)->country);
+     */
+    public static ?Closure $resolveLocation = null;
+
+    /**
      * The fully qualified class name of the user model.
      *
      * This model is responsible for persisting and managing users in the database.
@@ -85,6 +94,16 @@ class DeviceCreator
     public static function useUserDeviceModel(string $model): void
     {
         static::$userDeviceModel = $model;
+    }
+
+    /**
+     * Set a callback to resolve location from an IP address.
+     *
+     * The callback receives the IP string and should return a location string or null.
+     */
+    public static function resolveLocationUsing(Closure $callback): void
+    {
+        static::$resolveLocation = $callback;
     }
 
     /**

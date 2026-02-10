@@ -5,12 +5,14 @@ namespace UserDevices\Traits;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use UserDevices\DeviceCreator;
 use UserDevices\Models\UserDevice;
-use UserDevices\Notifications\NewLoginDeviceNotification;
+use UserDevices\Notifications\AttemptingLoginNotification;
+use UserDevices\Notifications\AuthenticatedLoginNotification;
+use UserDevices\Notifications\FailedLoginNotification;
 
 trait HasUserDevices
 {
     /**
-     * Get the personal tokens that belong to model.
+     * Get the user devices that belong to the model.
      */
     public function userDevices(): HasMany
     {
@@ -20,10 +22,26 @@ trait HasUserDevices
     }
 
     /**
-     * Send the new login device notification.
+     * Send the failed login notification.
      */
-    public function sendNewLoginDeviceNotification(UserDevice $device): void
+    public function sendFailedLoginNotification(UserDevice $device): void
     {
-        $this->notify(new NewLoginDeviceNotification($device));
+        $this->notify(new FailedLoginNotification($device));
+    }
+
+    /**
+     * Send the attempting login notification.
+     */
+    public function sendAttemptingLoginNotification(UserDevice $device): void
+    {
+        $this->notify(new AttemptingLoginNotification($device));
+    }
+
+    /**
+     * Send the authenticated login notification.
+     */
+    public function sendAuthenticatedLoginNotification(UserDevice $device): void
+    {
+        $this->notify(new AuthenticatedLoginNotification($device));
     }
 }

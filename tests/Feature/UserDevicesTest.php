@@ -4,7 +4,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use UserDevices\DeviceCreator;
-use UserDevices\Notifications\NewLoginDeviceNotification;
+use UserDevices\Notifications\AuthenticatedLoginNotification;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
 
@@ -55,7 +55,7 @@ test('it should send notification for new device when context is not set', funct
         ->withHeader('User-Agent', 'Mozilla/5.0 Brand New Device')
         ->get('/dashboard');
 
-    Notification::assertSentTo($user, NewLoginDeviceNotification::class);
+    Notification::assertSentTo($user, AuthenticatedLoginNotification::class);
 });
 
 test('it should not send notification when shouldSendNotificationUsing returns false', function () {
@@ -85,7 +85,7 @@ test('it should send notification when shouldSendNotificationUsing returns true'
         ->withHeader('User-Agent', 'Mozilla/5.0 Custom Callback Device')
         ->get('/dashboard');
 
-    Notification::assertSentTo($user, NewLoginDeviceNotification::class);
+    Notification::assertSentTo($user, AuthenticatedLoginNotification::class);
 
     DeviceCreator::$shouldSendNotification = null;
 });

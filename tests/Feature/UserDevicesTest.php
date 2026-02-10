@@ -4,7 +4,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use UserDevices\DeviceCreator;
-use UserDevices\Notifications\NewLoginDeviceNotification;
+use UserDevices\Notifications\AuthenticatedLoginNotification;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
 
@@ -39,9 +39,9 @@ test('it should not send notification when ignoreNotification is called via cont
 
     DeviceCreator::ignoreNotification();
 
-    $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Silent Device Browser')
-        ->get('/dashboard');
+    $this->actingAs($user)->get('/dashboard', [
+        'User-Agent' => 'Mozilla/5.0 Silent Device Browser',
+    ]);
 
     Notification::assertNothingSent();
 });
@@ -51,11 +51,11 @@ test('it should send notification for new device when context is not set', funct
 
     $user = User::factory()->create();
 
-    $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Brand New Device')
-        ->get('/dashboard');
+    $this->actingAs($user)->get('/dashboard', [
+        'User-Agent' => 'Mozilla/5.0 Brand New Device',
+    ]);
 
-    Notification::assertSentTo($user, NewLoginDeviceNotification::class);
+    Notification::assertSentTo($user, AuthenticatedLoginNotification::class);
 });
 
 test('it should not send notification when shouldSendNotificationUsing returns false', function () {
@@ -65,9 +65,9 @@ test('it should not send notification when shouldSendNotificationUsing returns f
 
     DeviceCreator::shouldSendNotificationUsing(fn () => false);
 
-    $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Yet Another New Device')
-        ->get('/dashboard');
+    $this->actingAs($user)->get('/dashboard', [
+        'User-Agent' => 'Mozilla/5.0 Yet Another New Device',
+    ]);
 
     Notification::assertNothingSent();
 
@@ -81,11 +81,11 @@ test('it should send notification when shouldSendNotificationUsing returns true'
 
     DeviceCreator::shouldSendNotificationUsing(fn () => true);
 
-    $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Custom Callback Device')
-        ->get('/dashboard');
+    $this->actingAs($user)->get('/dashboard', [
+        'User-Agent' => 'Mozilla/5.0 Custom Callback Device',
+    ]);
 
-    Notification::assertSentTo($user, NewLoginDeviceNotification::class);
+    Notification::assertSentTo($user, AuthenticatedLoginNotification::class);
 
     DeviceCreator::$shouldSendNotification = null;
 });
@@ -119,12 +119,12 @@ test('it should return 403 when hash is invalid', function () {
     $device = UserDevice::factory()->create(['user_id' => $user->id]);
 
     $url = URL::temporarySignedRoute(
-        'user-devices.block',
-        Carbon::now()->addMinutes(60),
-        [
+        name: 'user-devices.block',
+        expiration: Carbon::now()->addMinutes(60),
+        parameters: [
             'id' => $device->id,
             'hash' => 'invalid-hash',
-        ]
+        ],
     );
 
     $response = $this->get($url);
@@ -157,9 +157,9 @@ test('it should access dashboard when device is not blocked', function () {
         'user_agent' => 'Mozilla/5.0 Test Browser',
     ]);
 
-    $response = $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Test Browser')
-        ->get('/dashboard');
+    $response = $this->actingAs($user)->get('/dashboard', [
+        'User-Agent' => 'Mozilla/5.0 Test Browser',
+    ]);
 
     $response->assertOk();
     $response->assertJson(['message' => 'Access granted']);
@@ -171,12 +171,49 @@ test('it should return 423 when device is blocked', function () {
     UserDevice::factory()->create([
         'blocked' => true,
         'user_id' => $user->id,
+        'ip_address' => '127.0.0.1',
         'user_agent' => 'Mozilla/5.0 Blocked Browser',
     ]);
 
     $response = $this->actingAs($user)
-        ->withHeader('User-Agent', 'Mozilla/5.0 Blocked Browser')
-        ->get('/dashboard');
+        ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+        ->get('/dashboard', ['User-Agent' => 'Mozilla/5.0 Blocked Browser']);
 
     $response->assertStatus(423);
+});
+
+test('it should return true from isCurrentDeviceBlocked when device is blocked', function () {
+    $user = User::factory()->create();
+
+    UserDevice::factory()->create([
+        'blocked' => true,
+        'user_id' => $user->id,
+        'ip_address' => '192.168.50.1',
+        'user_agent' => 'Mozilla/5.0 IsBlocked Test Browser',
+    ]);
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '192.168.50.1'])->get('/test/current-device-blocked?email='.urlencode($user->email), [
+        'User-Agent' => 'Mozilla/5.0 IsBlocked Test Browser',
+    ]);
+
+    $response->assertOk();
+    expect($response->json('blocked'))->toBeTrue();
+});
+
+test('it should return false from isCurrentDeviceBlocked when device is not blocked', function () {
+    $user = User::factory()->create();
+
+    UserDevice::factory()->create([
+        'blocked' => false,
+        'user_id' => $user->id,
+        'ip_address' => '192.168.50.2',
+        'user_agent' => 'Mozilla/5.0 NotBlocked Test Browser',
+    ]);
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '192.168.50.2'])->get('/test/current-device-blocked?email='.urlencode($user->email), [
+        'User-Agent' => 'Mozilla/5.0 NotBlocked Test Browser',
+    ]);
+
+    $response->assertOk();
+    expect($response->json('blocked'))->toBeFalse();
 });

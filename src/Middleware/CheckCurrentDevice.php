@@ -38,8 +38,10 @@ class CheckCurrentDevice
     {
         $user = $request->user();
 
+        $ipAddress = $request->ip();
+
         $userAgent = $this->getUserAgent($request);
 
-        return $user->userDevices()->isBlocked($userAgent);
+        return $user->userDevices()->isBlocked($ipAddress, $userAgent);
     }
 }

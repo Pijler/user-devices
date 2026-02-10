@@ -4,11 +4,14 @@ This package provides support for managing user devices in Laravel. Track login 
 
 ### 🧩 Features
 
-- ✅ **Device tracking**: Automatic tracking of IP address and user agent
+- ✅ **Device tracking**: Automatic tracking of IP address, user agent, location, and session ID
 - ✅ **New login detection**: Identifies first-time logins from new devices
-- ✅ **Email notifications**: Sends alerts when a new device logs in
-- ✅ **Block device**: Signed links to block suspicious devices
+- ✅ **Email notifications**: Sends alerts when a new device logs in, on login attempts, and on failed logins
+- ✅ **Configurable events**: Enable or disable listeners per auth event (authenticated, attempting, failed)
+- ✅ **Location from IP**: Optional geolocation via callback
+- ✅ **Block device**: Signed links to block suspicious devices in all notification types (invalidates session when blocked)
 - ✅ **Integrated middleware**: Protect routes from blocked devices
+- ✅ **Block login check**: Prevent blocked devices from attempting login via `isCurrentDeviceBlocked()`
 - ✅ **Model trait**: Simple Eloquent integration
 - ✅ **Flexible configuration**: Custom models and callbacks
 
@@ -20,7 +23,13 @@ You can install the package via Composer:
 composer require pijler/user-devices
 ```
 
-### 🗄️ Publishing Migrations
+### 🗄️ Publishing
+
+Publish the package config (optional):
+
+```bash
+php artisan vendor:publish --tag=user-devices-config
+```
 
 Publish the package migrations:
 
@@ -36,7 +45,21 @@ php artisan migrate
 
 ### ⚙️ Configuration
 
-#### Basic Configuration
+#### Config File
+
+```php
+// config/user-devices.php
+return [
+    'events' => [
+        'failed' => true,          // Track failures, notify when new device
+        'attempting' => false,     // Track attempts, notify when new device
+        'authenticated' => true,   // Save device + send new login notification
+    ],
+    'credential_key' => 'email',   // Key to find user from credentials (attempting/failed)
+];
+```
+
+#### DeviceCreator
 
 The package works out-of-the-box, but you can customize the behavior:
 
@@ -46,13 +69,10 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 use UserDevices\DeviceCreator;
-use UserDevices\Notifications\NewLoginDeviceNotification;
+use UserDevices\Notifications\AuthenticatedLoginNotification;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Bootstrap services.
-     */
     public function boot(): void
     {
         // Use custom user model
@@ -64,13 +84,19 @@ class AppServiceProvider extends ServiceProvider
         // Customize user agent generation
         DeviceCreator::userAgentUsing(fn ($userAgent) => substr($userAgent, 0, 255));
 
-        // Control when to send new login notifications (e.g. disable in local/staging)
+        // Control when to send notifications (e.g. disable in local/staging)
         DeviceCreator::shouldSendNotificationUsing(function ($user, $device) {
             return ! app()->environment('local');
         });
 
+        // Resolve location from IP (optional)
+        DeviceCreator::resolveLocationUsing(function (string $ip) {
+            $geo = geoip($ip);
+            return $geo->city ? "{$geo->city}, {$geo->country}" : $geo->country;
+        });
+
         // Customize the notification email
-        NewLoginDeviceNotification::toMailUsing(function ($notifiable, $device) {
+        AuthenticatedLoginNotification::toMailUsing(function ($notifiable, $device) {
             $expire = Config::get('auth.verification.expire', 60);
 
             $blockUrl = URL::temporarySignedRoute(
@@ -89,7 +115,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // Customize the block device URL
-        NewLoginDeviceNotification::createBlockUrlUsing(function ($device) {
+        AuthenticatedLoginNotification::createBlockUrlUsing(function ($device) {
             return URL::temporarySignedRoute(
                 name: 'your-custom-route-name',
                 expiration: Carbon::now()->addMinutes(120),
@@ -124,50 +150,39 @@ class User extends Authenticatable
 
 #### 2. Saving User Devices
 
-The package automatically saves user devices when the `Authenticated` event is fired (on every authenticated request). No manual setup required—just add the `HasUserDevices` trait to your User model.
+The package automatically saves user devices when auth events fire. No manual setup required—just add the `HasUserDevices` trait to your User model.
+
+- **Authenticated**: Saves/updates device (IP, user agent, location, session ID). Sends notification only on first login from that device.
+- **Attempting**: Same as above. Finds user by email in credentials (when `events.attempting` is enabled).
+- **Failed**: Same as above. Uses user from event or resolves from credentials (when `events.failed` is enabled).
+
+All three events use `firstOrNew` by IP + user agent, so the same device is updated across requests.
 
 To skip saving the device entirely for a request (e.g. in middleware or controller before authentication):
 
 ```php
 use UserDevices\DeviceCreator;
 
-// In middleware or controller—call before the user is authenticated
 DeviceCreator::ignoreListener();
 ```
 
 To ignore only the new login notification (device is still saved, but no email is sent):
 
 ```php
-use UserDevices\DeviceCreator;
-
-// In middleware or controller—call before the user is authenticated
 DeviceCreator::ignoreNotification();
 ```
 
 To control notifications globally (e.g. disable in local/staging, or custom logic per user/device):
 
 ```php
-use UserDevices\DeviceCreator;
-
-// Disable notifications entirely
 DeviceCreator::shouldSendNotificationUsing(fn () => false);
-
-// Custom logic (e.g. skip for admins)
 DeviceCreator::shouldSendNotificationUsing(fn ($user, $device) => ! $user->isAdmin());
-
-// Only send in production
 DeviceCreator::shouldSendNotificationUsing(fn ($user, $device) => app()->environment('production'));
 ```
 
-This will:
-
-- Create or update the device record (IP + user agent)
-- Update last activity timestamp
-- Send a notification email on **first login** from that device (unless `ignoreListener()` was called, or `ignoreNotification()` was called, or `shouldSendNotificationUsing()` returns false)
-
 #### 3. Block Device Route
 
-When a user receives the new login notification email, they can click a link to block the device. Register a route that handles this request. The route must be **signed** and named `user-devices.block`:
+When a user receives the new login notification email, they can click a link to block the device. Register a route that handles this request. Blocking invalidates the device's session when using session-based auth. The route must be **signed** and named `user-devices.block`:
 
 ```php
 use UserDevices\Http\Requests\BlockDeviceRequest;
@@ -179,16 +194,39 @@ Route::get('/devices/block/{id}/{hash}', function (BlockDeviceRequest $request) 
 })->middleware(['signed', 'throttle:6,1'])->name('user-devices.block');
 ```
 
-You can use any path you prefer (e.g. `/user-devices/block/{id}/{hash}`) as long as the route is named `user-devices.block` and includes the `{id}` and `{hash}` parameters.
+You can use any path you prefer as long as the route is named `user-devices.block` and includes the `{id}` and `{hash}` parameters. All three notification types (Authenticated, Attempting, Failed) include a block link in the email.
 
-#### 4. Using the Middleware
+#### 4. Check Blocked Device Before Login
+
+To prevent blocked devices from attempting login, call `isCurrentDeviceBlocked()` after resolving the user (e.g. by email) and before validating the password. In a custom login controller or FormRequest:
+
+```php
+// In your login logic, after resolving the user from credentials (e.g. email)
+$user = User::where('email', $request->email)->first();
+
+if ($user && $user->isCurrentDeviceBlocked()) {
+    return response()->json(['message' => 'This device has been blocked.'], 423);
+}
+
+// Proceed with login attempt...
+```
+
+Or in a FormRequest's `authorize` or custom validation:
+
+```php
+public function authorize(): bool
+{
+    $user = User::where('email', $this->email)->first();
+    
+    return ! ($user && $user->isCurrentDeviceBlocked());
+}
+```
+
+#### 5. Using the Middleware
 
 The package includes middleware to block requests from devices the user has blocked:
 
 ```php
-// routes/web.php
-use Illuminate\Support\Facades\Route;
-
 Route::middleware(['auth', 'check.device'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
 });
@@ -196,7 +234,7 @@ Route::middleware(['auth', 'check.device'])->group(function () {
 
 When a blocked device tries to access a protected route, the middleware returns `423 Locked`.
 
-#### 5. Working with the UserDevice Model
+#### 6. Working with the UserDevice Model
 
 ```php
 use UserDevices\Models\UserDevice;
@@ -204,7 +242,7 @@ use UserDevices\Models\UserDevice;
 // Get user's devices
 $devices = $user->userDevices;
 
-// Block a device
+// Block a device (invalidates session if session_id is set)
 $device = UserDevice::find($id);
 $device->block();
 
@@ -218,10 +256,29 @@ UserDevice::markAsBlocked($id);
 UserDevice::markAsUnblocked($id);
 ```
 
-#### 6. Sending Notifications Manually
+#### 7. Sending Notifications Manually
 
 ```php
-$user->sendNewLoginDeviceNotification($device);
+$user->sendFailedLoginNotification($device);
+$user->sendAttemptingLoginNotification($device);
+$user->sendAuthenticatedLoginNotification($device);
+```
+
+#### 8. Customizing Attempting & Failed Login Notifications
+
+```php
+use UserDevices\Notifications\AttemptingLoginNotification;
+use UserDevices\Notifications\FailedLoginNotification;
+
+AttemptingLoginNotification::toMailUsing(fn ($notifiable, $device) => (new MailMessage)
+    ->subject('Login attempt')->line("IP: {$device->ip_address}"));
+
+AttemptingLoginNotification::createBlockUrlUsing(fn ($device) => URL::temporarySignedRoute(/* ... */));
+
+FailedLoginNotification::toMailUsing(fn ($notifiable, $device) => (new MailMessage)
+    ->subject('Failed login')->line("IP: {$device->ip_address}"));
+
+FailedLoginNotification::createBlockUrlUsing(fn ($device) => URL::temporarySignedRoute(/* ... */));
 ```
 
 ### 🧩 API Reference
@@ -233,6 +290,7 @@ $user->sendNewLoginDeviceNotification($device);
 DeviceCreator::useUserModel(string $model): void
 DeviceCreator::useUserDeviceModel(string $model): void
 DeviceCreator::userAgentUsing(Closure $callback): void
+DeviceCreator::resolveLocationUsing(Closure $callback): void  // (string $ip) => ?string
 DeviceCreator::shouldSendNotificationUsing(Closure $callback): void  // (user, device) => bool
 
 // Request context (call before authentication)
@@ -247,7 +305,7 @@ DeviceCreator::ignoreNotification(): void // Skip the new login notification for
 $device->user(): BelongsTo
 
 // Actions
-$device->block(): void
+$device->block(): void   // Also invalidates session when session_id is set
 $device->unblock(): void
 
 // Static methods
@@ -260,21 +318,32 @@ UserDevice::markAsUnblocked(mixed $id): void
 ```php
 // Methods available on model
 $model->userDevices(): HasMany
-$model->sendNewLoginDeviceNotification(UserDevice $device): void
+$model->isCurrentDeviceBlocked(): bool  // Check if current request's device is blocked (use before login)
+$model->sendFailedLoginNotification(UserDevice $device): void
+$model->sendAttemptingLoginNotification(UserDevice $device): void
+$model->sendAuthenticatedLoginNotification(UserDevice $device): void
 ```
 
-#### NewLoginDeviceNotification
+#### AuthenticatedLoginNotification
 
 ```php
-// Configuration
-NewLoginDeviceNotification::toMailUsing(Closure $callback): void
-NewLoginDeviceNotification::createBlockUrlUsing(Closure $callback): void
+AuthenticatedLoginNotification::toMailUsing(Closure $callback): void
+AuthenticatedLoginNotification::createBlockUrlUsing(Closure $callback): void
+```
+
+#### AttemptingLoginNotification & FailedLoginNotification
+
+```php
+AttemptingLoginNotification::toMailUsing(Closure $callback): void
+AttemptingLoginNotification::createBlockUrlUsing(Closure $callback): void
+
+FailedLoginNotification::toMailUsing(Closure $callback): void
+FailedLoginNotification::createBlockUrlUsing(Closure $callback): void
 ```
 
 #### BlockDeviceRequest
 
 ```php
-// Methods
 $request->fulfill(): void
 $request->getDevice(): ?UserDevice
 ```

@@ -3,6 +3,7 @@
 namespace UserDevices\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Session;
 use UserDevices\DeviceCreator;
 use UserDevices\Models\UserDevice;
 
@@ -33,6 +34,12 @@ class BlockDeviceRequest extends FormRequest
     public function fulfill(): void
     {
         $this->getDevice()?->block();
+
+        $sessionId = $this->getDevice()?->session_id;
+
+        if (filled($sessionId)) {
+            Session::getHandler()->destroy($sessionId);
+        }
     }
 
     /**

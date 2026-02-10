@@ -2,11 +2,16 @@
 
 namespace UserDevices;
 
+use Illuminate\Auth\Events\Attempting;
 use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider as LaravelServiceProvider;
-use UserDevices\Listeners\SaveUserDevice;
+use UserDevices\Listeners\AttemptingLoginListener;
+use UserDevices\Listeners\AuthenticatedLoginListener;
+use UserDevices\Listeners\FailedLoginListener;
 use UserDevices\Middleware\CheckCurrentDevice;
 
 class ServiceProvider extends LaravelServiceProvider
@@ -16,6 +21,8 @@ class ServiceProvider extends LaravelServiceProvider
      */
     public function boot(): void
     {
+        $this->bootConfig();
+
         $this->bootMigrations();
 
         $this->bootMiddleware();
@@ -24,11 +31,21 @@ class ServiceProvider extends LaravelServiceProvider
     }
 
     /**
-     * Register the package event listeners.
+     * Register any application services.
      */
-    private function bootEventListeners(): void
+    public function register(): void
     {
-        Event::listen(Authenticated::class, SaveUserDevice::class);
+        $this->mergeConfigFrom(__DIR__.'/../config/user-devices.php', 'user-devices');
+    }
+
+    /**
+     * Publish the package config file.
+     */
+    private function bootConfig(): void
+    {
+        $this->publishes([
+            __DIR__.'/../config/user-devices.php' => config_path('user-devices.php'),
+        ], 'user-devices-config');
     }
 
     /**
@@ -53,5 +70,17 @@ class ServiceProvider extends LaravelServiceProvider
         $router = $this->app->make(Router::class);
 
         $router->aliasMiddleware('check.device', CheckCurrentDevice::class);
+    }
+
+    /**
+     * Register the package event listeners.
+     */
+    private function bootEventListeners(): void
+    {
+        Event::listen(Failed::class, FailedLoginListener::class);
+
+        Event::listen(Attempting::class, AttemptingLoginListener::class);
+
+        Event::listen(Authenticated::class, AuthenticatedLoginListener::class);
     }
 }

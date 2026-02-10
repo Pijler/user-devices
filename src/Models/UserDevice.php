@@ -75,8 +75,12 @@ class UserDevice extends Model
      * Scope a query to check if the device is blocked.
      */
     #[Scope]
-    protected function isBlocked(Builder $query, mixed $userAgent): bool
+    protected function isBlocked(Builder $query, mixed $ipAddress = null, mixed $userAgent = null): bool
     {
-        return $query->where('user_agent', $userAgent)->where('blocked', true)->exists();
+        return $query->when(filled($ipAddress), function (Builder $query) use ($ipAddress) {
+            $query->where('ip_address', $ipAddress);
+        })->when(filled($userAgent), function (Builder $query) use ($userAgent) {
+            $query->where('user_agent', $userAgent);
+        })->where('blocked', true)->exists();
     }
 }

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\URL;
 use UserDevices\Models\UserDevice;
 
-class NewLoginDeviceNotification extends Notification
+class FailedLoginNotification extends Notification
 {
     /**
      * The callback that should be used to build the mail message.
@@ -51,7 +51,7 @@ class NewLoginDeviceNotification extends Notification
     }
 
     /**
-     * Get the new login device notification mail message.
+     * Get the failed login notification mail message.
      */
     protected function buildMailMessage(): MailMessage
     {
@@ -59,11 +59,11 @@ class NewLoginDeviceNotification extends Notification
         $deviceInfo = $this->formatDeviceInfo();
 
         return (new MailMessage)
-            ->subject(Lang::get('New Login Device Notification'))
-            ->line(Lang::get('You are receiving this email because we detected a new login to your account from a device we have not seen before.'))
+            ->subject(Lang::get('Failed Login Attempt to Your Account'))
+            ->line(Lang::get('A failed login attempt was detected for your account.'))
             ->line(Lang::get('Device details: :details', ['details' => $deviceInfo]))
             ->action(Lang::get('Block this device'), $blockUrl)
-            ->line(Lang::get('If this was you, you can safely ignore this email. If you did not perform this login, we recommend changing your password immediately.'));
+            ->line(Lang::get('If this was you, you may have entered the wrong password. If you did not attempt this login, we recommend changing your password immediately.'));
     }
 
     /**
@@ -94,15 +94,19 @@ class NewLoginDeviceNotification extends Notification
     {
         $parts = [];
 
-        if ($this->device->ip_address) {
+        if (filled($this->device->ip_address)) {
             $parts[] = Lang::get('IP Address: :ip', ['ip' => $this->device->ip_address]);
         }
 
-        if ($this->device->user_agent) {
+        if (filled($this->device->user_agent)) {
             $parts[] = Lang::get('Device: :device', ['device' => $this->device->user_agent]);
         }
 
-        return ! empty($parts) ? implode(' | ', $parts) : Lang::get('Unknown device');
+        if (filled($this->device->location)) {
+            $parts[] = Lang::get('Location: :location', ['location' => $this->device->location]);
+        }
+
+        return filled($parts) ? implode(' | ', $parts) : Lang::get('Unknown device');
     }
 
     /**

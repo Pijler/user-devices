@@ -19,10 +19,11 @@ test('it should proceed to next middleware when device is not blocked', function
     UserDevice::factory()->create([
         'blocked' => false,
         'user_id' => $user->id,
+        'ip_address' => '192.168.1.100',
         'user_agent' => 'Mozilla/5.0 Test',
     ]);
 
-    $request = Request::create('/dashboard', 'GET');
+    $request = Request::create('/dashboard', 'GET', [], [], [], ['REMOTE_ADDR' => '192.168.1.100']);
     $request->headers->set('User-Agent', 'Mozilla/5.0 Test');
     $request->setUserResolver(fn () => $user);
 
@@ -38,10 +39,11 @@ test('it should abort with 423 when device is blocked', function () {
     UserDevice::factory()->create([
         'blocked' => true,
         'user_id' => $user->id,
+        'ip_address' => '192.168.1.100',
         'user_agent' => 'Mozilla/5.0 Blocked',
     ]);
 
-    $request = Request::create('/dashboard', 'GET');
+    $request = Request::create('/dashboard', 'GET', [], [], [], ['REMOTE_ADDR' => '192.168.1.100']);
     $request->headers->set('User-Agent', 'Mozilla/5.0 Blocked');
     $request->setUserResolver(fn () => $user);
 

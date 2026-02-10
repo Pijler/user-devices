@@ -5,7 +5,6 @@ namespace UserDevices\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use UserDevices\DeviceCreator;
 
 class CheckCurrentDevice
 {
@@ -22,26 +21,12 @@ class CheckCurrentDevice
     }
 
     /**
-     * Get the user agent from the request.
-     */
-    private function getUserAgent(Request $request): mixed
-    {
-        $userAgent = $request->userAgent();
-
-        return with($userAgent, DeviceCreator::$userAgent);
-    }
-
-    /**
      * Check if the user agent is blocked.
      */
     private function checkUserAgent(Request $request): bool
     {
         $user = $request->user();
 
-        $ipAddress = $request->ip();
-
-        $userAgent = $this->getUserAgent($request);
-
-        return $user->userDevices()->isBlocked($ipAddress, $userAgent);
+        return $user->isCurrentDeviceBlocked();
     }
 }

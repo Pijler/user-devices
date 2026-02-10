@@ -3,6 +3,7 @@
 namespace UserDevices\Listeners;
 
 use Illuminate\Auth\Events\Failed;
+use Illuminate\Support\Facades\Config;
 use UserDevices\Traits\HandlesAuthEvents;
 
 class FailedLoginListener
@@ -14,6 +15,10 @@ class FailedLoginListener
      */
     public function handle(Failed $event): void
     {
+        if (! Config::get('user-devices.events.failed', true)) {
+            return;
+        }
+
         if ($this->shouldSkipListener()) {
             return;
         }

@@ -77,16 +77,10 @@ class ServiceProvider extends LaravelServiceProvider
      */
     private function bootEventListeners(): void
     {
-        if (Config::get('user-devices.events.failed', true)) {
-            Event::listen(Failed::class, FailedLoginListener::class);
-        }
+        Event::listen(Failed::class, FailedLoginListener::class);
 
-        if (Config::get('user-devices.events.attempting', false)) {
-            Event::listen(Attempting::class, AttemptingLoginListener::class);
-        }
-
-        if (Config::get('user-devices.events.authenticated', true)) {
-            Event::listen(Authenticated::class, AuthenticatedLoginListener::class);
-        }
+        Event::listen(Attempting::class, AttemptingLoginListener::class);
+        
+        Event::listen(Authenticated::class, AuthenticatedLoginListener::class);
     }
 }

@@ -3,6 +3,7 @@
 namespace UserDevices\Listeners;
 
 use Illuminate\Auth\Events\Attempting;
+use Illuminate\Support\Facades\Config;
 use UserDevices\Traits\HandlesAuthEvents;
 
 class AttemptingLoginListener
@@ -14,6 +15,10 @@ class AttemptingLoginListener
      */
     public function handle(Attempting $event): void
     {
+        if (! Config::get('user-devices.events.attempting', false)) {
+            return;
+        }
+
         if ($this->shouldSkipListener()) {
             return;
         }

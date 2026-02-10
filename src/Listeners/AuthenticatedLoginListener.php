@@ -3,6 +3,7 @@
 namespace UserDevices\Listeners;
 
 use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Support\Facades\Config;
 use UserDevices\Traits\HandlesAuthEvents;
 
 class AuthenticatedLoginListener
@@ -14,6 +15,10 @@ class AuthenticatedLoginListener
      */
     public function handle(Authenticated $event): void
     {
+        if (! Config::get('user-devices.events.authenticated', true)) {
+            return;
+        }
+
         if ($this->shouldSkipListener()) {
             return;
         }

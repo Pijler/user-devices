@@ -9,8 +9,9 @@ This package provides support for managing user devices in Laravel. Track login 
 - ✅ **Email notifications**: Sends alerts when a new device logs in, on login attempts, and on failed logins
 - ✅ **Configurable events**: Enable or disable listeners per auth event (authenticated, attempting, failed)
 - ✅ **Location from IP**: Optional geolocation via callback
-- ✅ **Block device**: Signed links to block suspicious devices (invalidates session when blocked)
+- ✅ **Block device**: Signed links to block suspicious devices in all notification types (invalidates session when blocked)
 - ✅ **Integrated middleware**: Protect routes from blocked devices
+- ✅ **Block login check**: Prevent blocked devices from attempting login via `isCurrentDeviceBlocked()`
 - ✅ **Model trait**: Simple Eloquent integration
 - ✅ **Flexible configuration**: Custom models and callbacks
 
@@ -193,9 +194,35 @@ Route::get('/devices/block/{id}/{hash}', function (BlockDeviceRequest $request) 
 })->middleware(['signed', 'throttle:6,1'])->name('user-devices.block');
 ```
 
-You can use any path you prefer as long as the route is named `user-devices.block` and includes the `{id}` and `{hash}` parameters.
+You can use any path you prefer as long as the route is named `user-devices.block` and includes the `{id}` and `{hash}` parameters. All three notification types (Authenticated, Attempting, Failed) include a block link in the email.
 
-#### 4. Using the Middleware
+#### 4. Check Blocked Device Before Login
+
+To prevent blocked devices from attempting login, call `isCurrentDeviceBlocked()` after resolving the user (e.g. by email) and before validating the password. In a custom login controller or FormRequest:
+
+```php
+// In your login logic, after resolving the user from credentials (e.g. email)
+$user = User::where('email', $request->email)->first();
+
+if ($user && $user->isCurrentDeviceBlocked()) {
+    return response()->json(['message' => 'This device has been blocked.'], 423);
+}
+
+// Proceed with login attempt...
+```
+
+Or in a FormRequest's `authorize` or custom validation:
+
+```php
+public function authorize(): bool
+{
+    $user = User::where('email', $this->email)->first();
+    
+    return ! ($user && $user->isCurrentDeviceBlocked());
+}
+```
+
+#### 5. Using the Middleware
 
 The package includes middleware to block requests from devices the user has blocked:
 
@@ -207,7 +234,7 @@ Route::middleware(['auth', 'check.device'])->group(function () {
 
 When a blocked device tries to access a protected route, the middleware returns `423 Locked`.
 
-#### 5. Working with the UserDevice Model
+#### 6. Working with the UserDevice Model
 
 ```php
 use UserDevices\Models\UserDevice;
@@ -229,7 +256,7 @@ UserDevice::markAsBlocked($id);
 UserDevice::markAsUnblocked($id);
 ```
 
-#### 6. Sending Notifications Manually
+#### 7. Sending Notifications Manually
 
 ```php
 $user->sendFailedLoginNotification($device);
@@ -237,7 +264,7 @@ $user->sendAttemptingLoginNotification($device);
 $user->sendAuthenticatedLoginNotification($device);
 ```
 
-#### 7. Customizing Attempting & Failed Login Notifications
+#### 8. Customizing Attempting & Failed Login Notifications
 
 ```php
 use UserDevices\Notifications\AttemptingLoginNotification;
@@ -246,8 +273,12 @@ use UserDevices\Notifications\FailedLoginNotification;
 AttemptingLoginNotification::toMailUsing(fn ($notifiable, $device) => (new MailMessage)
     ->subject('Login attempt')->line("IP: {$device->ip_address}"));
 
+AttemptingLoginNotification::createBlockUrlUsing(fn ($device) => URL::temporarySignedRoute(/* ... */));
+
 FailedLoginNotification::toMailUsing(fn ($notifiable, $device) => (new MailMessage)
     ->subject('Failed login')->line("IP: {$device->ip_address}"));
+
+FailedLoginNotification::createBlockUrlUsing(fn ($device) => URL::temporarySignedRoute(/* ... */));
 ```
 
 ### 🧩 API Reference
@@ -287,6 +318,7 @@ UserDevice::markAsUnblocked(mixed $id): void
 ```php
 // Methods available on model
 $model->userDevices(): HasMany
+$model->isCurrentDeviceBlocked(): bool  // Check if current request's device is blocked (use before login)
 $model->sendFailedLoginNotification(UserDevice $device): void
 $model->sendAttemptingLoginNotification(UserDevice $device): void
 $model->sendAuthenticatedLoginNotification(UserDevice $device): void
@@ -302,8 +334,11 @@ AuthenticatedLoginNotification::createBlockUrlUsing(Closure $callback): void
 #### AttemptingLoginNotification & FailedLoginNotification
 
 ```php
-FailedLoginNotification::toMailUsing(Closure $callback): void
 AttemptingLoginNotification::toMailUsing(Closure $callback): void
+AttemptingLoginNotification::createBlockUrlUsing(Closure $callback): void
+
+FailedLoginNotification::toMailUsing(Closure $callback): void
+FailedLoginNotification::createBlockUrlUsing(Closure $callback): void
 ```
 
 #### BlockDeviceRequest

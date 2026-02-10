@@ -4,6 +4,7 @@ namespace UserDevices\Traits;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use UserDevices\DeviceCreator;
+use UserDevices\DTO\DeviceContext;
 use UserDevices\Models\UserDevice;
 use UserDevices\Notifications\AttemptingLoginNotification;
 use UserDevices\Notifications\AuthenticatedLoginNotification;
@@ -43,5 +44,20 @@ trait HasUserDevices
     public function sendAuthenticatedLoginNotification(UserDevice $device): void
     {
         $this->notify(new AuthenticatedLoginNotification($device));
+    }
+
+    /**
+     * Check if the current request's device (IP + user agent) is blocked for this user.
+     * Use in login controller or FormRequest to prevent blocked devices from attempting login.
+     */
+    public function isCurrentDeviceBlocked(): bool
+    {
+        $context = DeviceContext::fromRequest();
+
+        if (blank($context->ipAddress) && blank($context->userAgent)) {
+            return false;
+        }
+
+        return $this->userDevices()->isBlocked($context->ipAddress, $context->userAgent);
     }
 }

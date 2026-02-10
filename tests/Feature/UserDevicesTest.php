@@ -171,12 +171,49 @@ test('it should return 423 when device is blocked', function () {
     UserDevice::factory()->create([
         'blocked' => true,
         'user_id' => $user->id,
+        'ip_address' => '127.0.0.1',
         'user_agent' => 'Mozilla/5.0 Blocked Browser',
     ]);
 
-    $response = $this->actingAs($user)->get('/dashboard', [
-        'User-Agent' => 'Mozilla/5.0 Blocked Browser',
-    ]);
+    $response = $this->actingAs($user)
+        ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+        ->get('/dashboard', ['User-Agent' => 'Mozilla/5.0 Blocked Browser']);
 
     $response->assertStatus(423);
+});
+
+test('it should return true from isCurrentDeviceBlocked when device is blocked', function () {
+    $user = User::factory()->create();
+
+    UserDevice::factory()->create([
+        'blocked' => true,
+        'user_id' => $user->id,
+        'ip_address' => '192.168.50.1',
+        'user_agent' => 'Mozilla/5.0 IsBlocked Test Browser',
+    ]);
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '192.168.50.1'])->get('/test/current-device-blocked?email='.urlencode($user->email), [
+        'User-Agent' => 'Mozilla/5.0 IsBlocked Test Browser',
+    ]);
+
+    $response->assertOk();
+    expect($response->json('blocked'))->toBeTrue();
+});
+
+test('it should return false from isCurrentDeviceBlocked when device is not blocked', function () {
+    $user = User::factory()->create();
+
+    UserDevice::factory()->create([
+        'blocked' => false,
+        'user_id' => $user->id,
+        'ip_address' => '192.168.50.2',
+        'user_agent' => 'Mozilla/5.0 NotBlocked Test Browser',
+    ]);
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '192.168.50.2'])->get('/test/current-device-blocked?email='.urlencode($user->email), [
+        'User-Agent' => 'Mozilla/5.0 NotBlocked Test Browser',
+    ]);
+
+    $response->assertOk();
+    expect($response->json('blocked'))->toBeFalse();
 });

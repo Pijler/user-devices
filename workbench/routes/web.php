@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use UserDevices\Http\Requests\BlockDeviceRequest;
@@ -25,7 +26,7 @@ Route::get('/devices/block/{id}/{hash}', function (BlockDeviceRequest $request) 
     return redirect('/')->with('message', 'Device blocked successfully.');
 })->middleware(['signed', 'throttle:6,1'])->name('user-devices.block');
 
-Route::post('/login', function (\Illuminate\Http\Request $request) {
+Route::post('/login', function (Request $request) {
     if (Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
         $request->session()->regenerate();
 

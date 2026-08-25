@@ -1,4 +1,10 @@
-# 📱 Laravel User Devices
+<p align="center">
+<img src="https://raw.githubusercontent.com/Pijler/docs/main/assets/pijler-icon-dark.svg" height="100" alt="Pijler logo">
+</p>
+
+<h2><p align="center">Laravel User Devices</p></h2>
+
+### 🚀 Introduction
 
 This package provides support for managing user devices in Laravel. Track login devices, detect new logins, send notifications, and allow users to block suspicious devices—useful for security monitoring, session management, and multi-device applications.
 
@@ -352,4 +358,4 @@ $request->getDevice(): ?UserDevice
 
 Open-source under the [MIT license](LICENSE).
 
-## 🚀 Thanks!
+### 🚀 Thanks!

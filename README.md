@@ -2,7 +2,7 @@
 <img src="https://raw.githubusercontent.com/Pijler/docs/main/assets/pijler-icon-dark.svg" height="100" alt="Pijler logo">
 </p>
 
-<h2><p align="center">Laravel User Devices</p></h2>
+<h2><p align="center">User Devices</p></h2>
 
 ### 🚀 Introduction
 

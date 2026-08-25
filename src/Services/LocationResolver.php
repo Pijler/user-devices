@@ -1,8 +1,8 @@
 <?php
 
-namespace UserDevices\Services;
+namespace Pijler\UserDevices\Services;
 
-use UserDevices\DeviceCreator;
+use Pijler\UserDevices\DeviceCreator;
 
 class LocationResolver
 {

@@ -1,13 +1,13 @@
 <?php
 
-namespace UserDevices\Traits;
+namespace Pijler\UserDevices\Traits;
 
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Context;
-use UserDevices\DeviceCreator;
-use UserDevices\DTO\DeviceContext;
-use UserDevices\Models\UserDevice;
+use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\DTO\DeviceContext;
+use Pijler\UserDevices\Models\UserDevice;
 
 trait HandlesAuthEvents
 {

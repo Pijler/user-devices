@@ -1,6 +1,6 @@
 <?php
 
-use UserDevices\DTO\DeviceContext;
+use Pijler\UserDevices\DTO\DeviceContext;
 
 test('it should create context with named parameters', function () {
     $context = new DeviceContext(

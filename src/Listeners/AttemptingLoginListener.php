@@ -1,10 +1,10 @@
 <?php
 
-namespace UserDevices\Listeners;
+namespace Pijler\UserDevices\Listeners;
 
 use Illuminate\Auth\Events\Attempting;
 use Illuminate\Support\Facades\Config;
-use UserDevices\Traits\HandlesAuthEvents;
+use Pijler\UserDevices\Traits\HandlesAuthEvents;
 
 class AttemptingLoginListener
 {

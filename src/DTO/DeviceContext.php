@@ -1,11 +1,11 @@
 <?php
 
-namespace UserDevices\DTO;
+namespace Pijler\UserDevices\DTO;
 
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Session;
-use UserDevices\DeviceCreator;
-use UserDevices\Services\LocationResolver;
+use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\Services\LocationResolver;
 
 readonly class DeviceContext
 {

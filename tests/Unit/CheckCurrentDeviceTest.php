@@ -4,8 +4,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Facade;
+use Pijler\UserDevices\Middleware\CheckCurrentDevice;
 use Symfony\Component\HttpKernel\Exception\HttpException;
-use UserDevices\Middleware\CheckCurrentDevice;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
 

@@ -5,7 +5,7 @@ namespace Workbench\App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use UserDevices\Traits\HasUserDevices;
+use Pijler\UserDevices\Traits\HasUserDevices;
 
 class User extends Authenticatable
 {

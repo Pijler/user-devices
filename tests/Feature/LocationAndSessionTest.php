@@ -1,6 +1,6 @@
 <?php
 
-use UserDevices\DeviceCreator;
+use Pijler\UserDevices\DeviceCreator;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
 

@@ -74,8 +74,8 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
-use UserDevices\DeviceCreator;
-use UserDevices\Notifications\AuthenticatedLoginNotification;
+use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\Notifications\AuthenticatedLoginNotification;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -145,7 +145,7 @@ Add the `HasUserDevices` trait to your User model. Your User model must also use
 
 ```php
 use Illuminate\Notifications\Notifiable;
-use UserDevices\Traits\HasUserDevices;
+use Pijler\UserDevices\Traits\HasUserDevices;
 
 class User extends Authenticatable
 {
@@ -167,7 +167,7 @@ All three events use `firstOrNew` by IP + user agent, so the same device is upda
 To skip saving the device entirely for a request (e.g. in middleware or controller before authentication):
 
 ```php
-use UserDevices\DeviceCreator;
+use Pijler\UserDevices\DeviceCreator;
 
 DeviceCreator::ignoreListener();
 ```
@@ -191,7 +191,7 @@ DeviceCreator::shouldSendNotificationUsing(fn ($user, $device) => app()->environ
 When a user receives the new login notification email, they can click a link to block the device. Register a route that handles this request. Blocking invalidates the device's session when using session-based auth. The route must be **signed** and named `user-devices.block`:
 
 ```php
-use UserDevices\Http\Requests\BlockDeviceRequest;
+use Pijler\UserDevices\Http\Requests\BlockDeviceRequest;
 
 Route::get('/devices/block/{id}/{hash}', function (BlockDeviceRequest $request) {
     $request->fulfill();
@@ -243,7 +243,7 @@ When a blocked device tries to access a protected route, the middleware returns 
 #### 6. Working with the UserDevice Model
 
 ```php
-use UserDevices\Models\UserDevice;
+use Pijler\UserDevices\Models\UserDevice;
 
 // Get user's devices
 $devices = $user->userDevices;
@@ -273,8 +273,8 @@ $user->sendAuthenticatedLoginNotification($device);
 #### 8. Customizing Attempting & Failed Login Notifications
 
 ```php
-use UserDevices\Notifications\AttemptingLoginNotification;
-use UserDevices\Notifications\FailedLoginNotification;
+use Pijler\UserDevices\Notifications\AttemptingLoginNotification;
+use Pijler\UserDevices\Notifications\FailedLoginNotification;
 
 AttemptingLoginNotification::toMailUsing(fn ($notifiable, $device) => (new MailMessage)
     ->subject('Login attempt')->line("IP: {$device->ip_address}"));

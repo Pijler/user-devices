@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Notification;
-use UserDevices\DeviceCreator;
-use UserDevices\Notifications\AuthenticatedLoginNotification;
+use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\Notifications\AuthenticatedLoginNotification;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
 

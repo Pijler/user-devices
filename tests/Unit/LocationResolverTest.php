@@ -1,7 +1,7 @@
 <?php
 
-use UserDevices\DeviceCreator;
-use UserDevices\Services\LocationResolver;
+use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\Services\LocationResolver;
 
 test('it should return null when resolve location is not configured', function () {
     DeviceCreator::$resolveLocation = null;

@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Routing\Route;
-use UserDevices\DeviceCreator;
-use UserDevices\Http\Requests\BlockDeviceRequest;
+use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\Http\Requests\BlockDeviceRequest;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
 

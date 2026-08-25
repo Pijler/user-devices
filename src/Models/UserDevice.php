@@ -1,13 +1,13 @@
 <?php
 
-namespace UserDevices\Models;
+namespace Pijler\UserDevices\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use UserDevices\DeviceCreator;
+use Pijler\UserDevices\DeviceCreator;
 
 class UserDevice extends Model
 {

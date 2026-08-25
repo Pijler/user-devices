@@ -27,7 +27,7 @@
     },
     "autoload": {
         "psr-4": {
-            "UserDevices\\": "src/"
+            "Pijler\\UserDevices\\": "src/"
         }
     },
     "autoload-dev": {
@@ -49,7 +49,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "UserDevices\\ServiceProvider"
+                "Pijler\\UserDevices\\ServiceProvider"
             ]
         }
     },

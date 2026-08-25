@@ -1,6 +1,6 @@
 <?php
 
-namespace UserDevices;
+namespace Pijler\UserDevices;
 
 use Illuminate\Auth\Events\Attempting;
 use Illuminate\Auth\Events\Authenticated;
@@ -9,10 +9,10 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider as LaravelServiceProvider;
-use UserDevices\Listeners\AttemptingLoginListener;
-use UserDevices\Listeners\AuthenticatedLoginListener;
-use UserDevices\Listeners\FailedLoginListener;
-use UserDevices\Middleware\CheckCurrentDevice;
+use Pijler\UserDevices\Listeners\AttemptingLoginListener;
+use Pijler\UserDevices\Listeners\AuthenticatedLoginListener;
+use Pijler\UserDevices\Listeners\FailedLoginListener;
+use Pijler\UserDevices\Middleware\CheckCurrentDevice;
 
 class ServiceProvider extends LaravelServiceProvider
 {

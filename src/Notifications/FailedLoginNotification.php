@@ -1,6 +1,6 @@
 <?php
 
-namespace UserDevices\Notifications;
+namespace Pijler\UserDevices\Notifications;
 
 use Closure;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -9,7 +9,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\URL;
-use UserDevices\Models\UserDevice;
+use Pijler\UserDevices\Models\UserDevice;
 
 class FailedLoginNotification extends Notification
 {

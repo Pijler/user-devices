@@ -3,7 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use UserDevices\Http\Requests\BlockDeviceRequest;
+use Pijler\UserDevices\Http\Requests\BlockDeviceRequest;
 use Workbench\App\Models\User;
 
 Route::get('/', fn () => response()->json(['ok' => true]));

@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Notification;
-use UserDevices\Notifications\FailedLoginNotification;
+use Pijler\UserDevices\Notifications\FailedLoginNotification;
 use Workbench\App\Models\User;
 
 beforeEach(function () {

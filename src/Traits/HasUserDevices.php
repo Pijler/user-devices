@@ -1,14 +1,14 @@
 <?php
 
-namespace UserDevices\Traits;
+namespace Pijler\UserDevices\Traits;
 
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use UserDevices\DeviceCreator;
-use UserDevices\DTO\DeviceContext;
-use UserDevices\Models\UserDevice;
-use UserDevices\Notifications\AttemptingLoginNotification;
-use UserDevices\Notifications\AuthenticatedLoginNotification;
-use UserDevices\Notifications\FailedLoginNotification;
+use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\DTO\DeviceContext;
+use Pijler\UserDevices\Models\UserDevice;
+use Pijler\UserDevices\Notifications\AttemptingLoginNotification;
+use Pijler\UserDevices\Notifications\AuthenticatedLoginNotification;
+use Pijler\UserDevices\Notifications\FailedLoginNotification;
 
 trait HasUserDevices
 {

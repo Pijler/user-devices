@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Notification;
-use UserDevices\Notifications\AttemptingLoginNotification;
+use Pijler\UserDevices\Notifications\AttemptingLoginNotification;
 use Workbench\App\Models\User;
 
 beforeEach(function () {

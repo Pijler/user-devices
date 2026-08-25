@@ -1,12 +1,12 @@
 <?php
 
-namespace UserDevices\Http\Requests;
+namespace Pijler\UserDevices\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
-use UserDevices\DeviceCreator;
-use UserDevices\Models\UserDevice;
+use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\Models\UserDevice;
 
 class BlockDeviceRequest extends FormRequest
 {

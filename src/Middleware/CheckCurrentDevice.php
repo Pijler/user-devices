@@ -1,6 +1,6 @@
 <?php
 
-namespace UserDevices\Middleware;
+namespace Pijler\UserDevices\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;

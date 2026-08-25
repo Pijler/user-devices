@@ -1,10 +1,10 @@
 <?php
 
-namespace UserDevices;
+namespace Pijler\UserDevices;
 
 use Closure;
 use Illuminate\Support\Facades\Context;
-use UserDevices\Models\UserDevice;
+use Pijler\UserDevices\Models\UserDevice;
 
 class DeviceCreator
 {

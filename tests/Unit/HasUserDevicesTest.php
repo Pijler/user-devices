@@ -92,3 +92,30 @@ test('it should query user devices only once when resolving current device and c
 
     expect($deviceQueries)->toHaveCount(1);
 });
+
+test('it should keep current devices with dotted ips and user agents as distinct keys', function () {
+    $user = User::factory()->create();
+
+    $request = Request::create('/', 'GET', [], [], [], [
+        'REMOTE_ADDR' => '10.0.0.8',
+        'HTTP_USER_AGENT' => 'Mozilla/5.0',
+    ]);
+
+    Facade::clearResolvedInstance('request');
+    $this->instance('request', $request);
+
+    $first = $user->currentDevice();
+
+    $request = Request::create('/', 'GET', [], [], [], [
+        'REMOTE_ADDR' => '10.0.0.8',
+        'HTTP_USER_AGENT' => 'Mozilla/5.0.Extra',
+    ]);
+
+    Facade::clearResolvedInstance('request');
+    $this->instance('request', $request);
+
+    $second = $user->currentDevice();
+
+    expect($first)->not->toBe($second);
+    expect($user->currentDevice())->toBe($second);
+});

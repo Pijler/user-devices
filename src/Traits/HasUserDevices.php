@@ -14,8 +14,6 @@ trait HasUserDevices
 {
     /**
      * Current request devices already resolved for this user, keyed by IP + user agent.
-     *
-     * @var array<string, UserDevice>
      */
     private array $currentUserDevices = [];
 
@@ -82,17 +80,13 @@ trait HasUserDevices
 
         $cacheKey = "{$context->ipAddress}|{$context->userAgent}";
 
-        if (data_has($this->currentUserDevices, $cacheKey)) {
-            return data_get($this->currentUserDevices, $cacheKey);
+        if (array_key_exists($cacheKey, $this->currentUserDevices)) {
+            return $this->currentUserDevices[$cacheKey];
         }
 
-        $device = $this->userDevices()->firstOrNew([
+        return $this->currentUserDevices[$cacheKey] = $this->userDevices()->firstOrNew([
             'ip_address' => $context->ipAddress,
             'user_agent' => $context->userAgent,
         ]);
-
-        return tap($device, function ($device) use ($cacheKey) {
-            data_set($this->currentUserDevices, $cacheKey, $device);
-        });
     }
 }

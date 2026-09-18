@@ -1,14 +1,14 @@
 <?php
 
-use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Pijler\UserDevices\DeviceCreator;
-use Pijler\UserDevices\Listeners\AuthenticatedLoginListener;
+use Pijler\UserDevices\Middleware\CheckCurrentDevice;
 use Pijler\UserDevices\Notifications\AuthenticatedLoginNotification;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
@@ -239,7 +239,6 @@ test('it should run at most two user_devices queries on an authenticated request
         'REMOTE_ADDR' => '127.0.0.1',
         'HTTP_USER_AGENT' => $userAgent,
     ]);
-    $request->setUserResolver(fn () => $user);
 
     Facade::clearResolvedInstance('request');
     $this->instance('request', $request);
@@ -247,9 +246,11 @@ test('it should run at most two user_devices queries on an authenticated request
     DB::flushQueryLog();
     DB::enableQueryLog();
 
-    (new AuthenticatedLoginListener)->handle(new Authenticated('web', $user));
+    Auth::guard('web')->setUser($user);
 
-    expect($user->isCurrentDeviceBlocked())->toBeFalse();
+    $response = (new CheckCurrentDevice)->handle($request, fn ($request) => response('ok'));
+
+    expect($response->getContent())->toBe('ok');
 
     $deviceQueries = collect(DB::getQueryLog())->filter(function (array $query) {
         return str_contains($query['query'], 'user_devices');

@@ -1,9 +1,14 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\Middleware\CheckCurrentDevice;
 use Pijler\UserDevices\Notifications\AuthenticatedLoginNotification;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
@@ -216,4 +221,40 @@ test('it should return false from isCurrentDeviceBlocked when device is not bloc
 
     $response->assertOk();
     expect($response->json('blocked'))->toBeFalse();
+});
+
+test('it should run at most two user_devices queries on an authenticated request', function () {
+    $user = User::factory()->create();
+    $userAgent = 'Mozilla/5.0 Query Count Browser';
+
+    UserDevice::factory()->create([
+        'blocked' => false,
+        'user_id' => $user->id,
+        'user_agent' => $userAgent,
+        'ip_address' => '127.0.0.1',
+        'last_activity' => Carbon::now()->subHour()->timestamp,
+    ]);
+
+    $request = Request::create('/dashboard', 'GET', [], [], [], [
+        'REMOTE_ADDR' => '127.0.0.1',
+        'HTTP_USER_AGENT' => $userAgent,
+    ]);
+
+    Facade::clearResolvedInstance('request');
+    $this->instance('request', $request);
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+
+    Auth::guard('web')->setUser($user);
+
+    $response = (new CheckCurrentDevice)->handle($request, fn ($request) => response('ok'));
+
+    expect($response->getContent())->toBe('ok');
+
+    $deviceQueries = collect(DB::getQueryLog())->filter(function (array $query) {
+        return str_contains($query['query'], 'user_devices');
+    });
+
+    expect($deviceQueries)->toHaveCount(2);
 });

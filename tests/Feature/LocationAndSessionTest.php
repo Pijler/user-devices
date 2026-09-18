@@ -21,6 +21,33 @@ test('it should save location when resolveLocationUsing is configured', function
     DeviceCreator::$resolveLocation = null;
 });
 
+test('it should not resolve location again when the ip is already in session', function () {
+    $calls = 0;
+
+    DeviceCreator::resolveLocationUsing(function (string $ip) use (&$calls) {
+        $calls++;
+
+        return $ip === '127.0.0.1' ? 'Localhost, Test' : null;
+    });
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->get('/dashboard', [
+        'User-Agent' => 'Mozilla/5.0 Location Session First',
+    ]);
+
+    $callsAfterFirstRequest = $calls;
+
+    $this->get('/dashboard', [
+        'User-Agent' => 'Mozilla/5.0 Location Session Second',
+    ]);
+
+    expect($calls)->toBe($callsAfterFirstRequest);
+    expect($callsAfterFirstRequest)->toBeGreaterThan(0);
+
+    DeviceCreator::$resolveLocation = null;
+});
+
 test('it should block device with session_id without throwing', function () {
     $user = User::factory()->create();
 

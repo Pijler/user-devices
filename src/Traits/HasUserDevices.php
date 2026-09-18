@@ -13,6 +13,11 @@ use Pijler\UserDevices\Notifications\FailedLoginNotification;
 trait HasUserDevices
 {
     /**
+     * Current request devices already resolved for this user, keyed by IP + user agent.
+     */
+    private array $currentUserDevices = [];
+
+    /**
      * Get the user devices that belong to the model.
      */
     public function userDevices(): HasMany
@@ -58,6 +63,30 @@ trait HasUserDevices
             return false;
         }
 
-        return $this->userDevices()->isBlocked($context->ipAddress, $context->userAgent);
+        $device = $this->currentDevice();
+
+        return $device->exists && $device->blocked;
+    }
+
+    /**
+     * Resolve the current request's device (IP + user agent) for this user.
+     *
+     * The result is memoized on the user instance so the blocked-device check
+     * and last-activity update share a single SELECT per request.
+     */
+    public function currentDevice(): UserDevice
+    {
+        $context = DeviceContext::fromRequest();
+
+        $cacheKey = "{$context->ipAddress}|{$context->userAgent}";
+
+        if (array_key_exists($cacheKey, $this->currentUserDevices)) {
+            return $this->currentUserDevices[$cacheKey];
+        }
+
+        return $this->currentUserDevices[$cacheKey] = $this->userDevices()->firstOrNew([
+            'ip_address' => $context->ipAddress,
+            'user_agent' => $context->userAgent,
+        ]);
     }
 }

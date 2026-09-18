@@ -70,10 +70,7 @@ trait HandlesAuthEvents
     {
         $context = DeviceContext::fromRequest();
 
-        $device = $user->userDevices()->firstOrNew([
-            'ip_address' => $context->ipAddress,
-            'user_agent' => $context->userAgent,
-        ]);
+        $device = $user->currentDevice();
 
         tap($device->exists, function ($exists) use ($user, $device, $context, $notify) {
             $device->fill([

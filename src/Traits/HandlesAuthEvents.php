@@ -73,13 +73,15 @@ trait HandlesAuthEvents
 
         $context = DeviceContext::fromRequest();
 
-        tap($device->exists, function ($exists) use ($user, $device, $context, $notify) {
+        $shouldQueueCookie = $this->shouldQueueDeviceCookie($context, $device);
+
+        tap($device->exists, function ($exists) use ($user, $device, $context, $notify, $shouldQueueCookie) {
             $device->fill([
                 'session_id' => $context->sessionId,
                 'last_activity' => Carbon::now()->timestamp,
             ])->save();
 
-            if ($this->shouldQueueDeviceCookie($context, $device)) {
+            if ($shouldQueueCookie) {
                 DeviceTokenResolver::queue();
             }
 

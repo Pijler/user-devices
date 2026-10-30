@@ -9,6 +9,7 @@ use Illuminate\Testing\TestResponse;
 use Pijler\UserDevices\DeviceCreator;
 use Pijler\UserDevices\DTO\DeviceContext;
 use Pijler\UserDevices\Exceptions\InvalidIdentifyByException;
+use Pijler\UserDevices\Exceptions\MissingLocationResolverException;
 use Pijler\UserDevices\Notifications\AuthenticatedLoginNotification;
 use Pijler\UserDevices\Notifications\FailedLoginNotification;
 use Workbench\App\Models\User;
@@ -309,3 +310,53 @@ test('it should not send the device cookie when identifying by attributes', func
 
     expect($response->getCookie('user_device'))->toBeNull();
 });
+
+test('it should not replace the token of a device when a cookieless client matches it', function () {
+    $user = User::factory()->create(['password' => 'password']);
+
+    $device = UserDevice::factory()->create([
+        'user_id' => $user->id,
+        'ip_address' => '10.0.0.1',
+        'user_agent' => 'Mozilla/5.0 Office Browser',
+        'device_token' => hash('sha256', 'browser-a-token'),
+    ]);
+
+    loginFrom($user, '10.0.0.1', 'Mozilla/5.0 Office Browser');
+
+    expect($user->userDevices()->count())->toBe(1);
+    expect($device->fresh()->device_token)->toBe(hash('sha256', 'browser-a-token'));
+});
+
+test('it should agree with isCurrentDeviceBlocked when the token matches an unblocked device', function () {
+    $user = User::factory()->create();
+
+    UserDevice::factory()->blocked()->create([
+        'user_id' => $user->id,
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'Mozilla/5.0 Shared',
+    ]);
+
+    UserDevice::factory()->create([
+        'user_id' => $user->id,
+        'device_token' => hash('sha256', 'unblocked-token'),
+    ]);
+
+    $request = Request::create('/', 'GET', [], ['user_device' => 'unblocked-token'], [], [
+        'REMOTE_ADDR' => '127.0.0.1',
+        'HTTP_USER_AGENT' => 'Mozilla/5.0 Shared',
+    ]);
+
+    $request->setLaravelSession(app('session')->driver());
+
+    Facade::clearResolvedInstance('request');
+    $this->instance('request', $request);
+
+    expect($user->isCurrentDeviceBlocked())->toBeFalse();
+    expect(UserDevice::where('user_id', $user->id)->isBlocked())->toBeFalse();
+});
+
+test('it should throw when identify_by uses location without a resolver', function () {
+    Config::set('user-devices.identify_by', ['location', 'user_agent']);
+
+    DeviceContext::fromRequest();
+})->throws(MissingLocationResolverException::class);

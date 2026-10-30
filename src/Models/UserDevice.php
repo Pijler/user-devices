@@ -73,12 +73,12 @@ class UserDevice extends Model
     }
 
     /**
-     * Scope a query to check if any device matching the current request is blocked.
+     * Scope a query to check if the device matching the current request is blocked.
      */
     #[Scope]
     protected function isBlocked(Builder $query): bool
     {
-        return $query->matchingContext()->where('blocked', true)->exists();
+        return (bool) $query->matchingContext()->value('blocked');
     }
 
     /**
@@ -90,7 +90,8 @@ class UserDevice extends Model
      *   so clients that never keep the cookie don't create a new device on every request;
      * - a request without a session can't keep the cookie, so it matches untokened devices by user agent.
      *
-     * Blocked devices come first so a blocked match is never hidden by an unblocked one.
+     * A device matched by token comes first, as it's the most reliable identification.
+     * Among the remaining matches, blocked devices come first so they are never hidden.
      */
     #[Scope]
     protected function matchingContext(Builder $query): void

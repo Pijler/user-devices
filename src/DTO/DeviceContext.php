@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Session;
 use Pijler\UserDevices\DeviceCreator;
 use Pijler\UserDevices\Exceptions\InvalidIdentifyByException;
+use Pijler\UserDevices\Exceptions\MissingLocationResolverException;
 use Pijler\UserDevices\Models\UserDevice;
 use Pijler\UserDevices\Services\DeviceTokenResolver;
 use Pijler\UserDevices\Services\LocationResolver;
@@ -152,6 +153,8 @@ class DeviceContext
         });
 
         throw_unless($valid, InvalidIdentifyByException::make());
+
+        throw_if($attributes->contains('location') && blank(DeviceCreator::$resolveLocation), MissingLocationResolverException::make());
 
         return $attributes->values()->all();
     }

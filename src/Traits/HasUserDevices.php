@@ -88,7 +88,9 @@ trait HasUserDevices
 
         $device->fill($context->attributes());
 
-        if (filled($context->deviceToken)) {
+        $keepsToken = $context->newDeviceToken && filled($device->device_token);
+
+        if (filled($context->deviceToken) && ! $keepsToken) {
             $device->device_token = $context->deviceToken;
         }
 

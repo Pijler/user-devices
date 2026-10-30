@@ -82,14 +82,14 @@ The `identify_by` option controls how a request is matched to a stored device:
 | `['location', 'user_agent']`   | Location + user agent                        | Tolerates IP changes within the same location, while a login from elsewhere is a new device. Requires `DeviceCreator::resolveLocationUsing()`.                                                |
 | `['ip_address', 'user_agent']` | IP address + user agent                      | Strictest match, but mobile networks, VPNs and Wi-Fi/4G switches create many "new device" alerts.                                                                                             |
 
-Any combination of `location`, `ip_address` and `user_agent` is accepted; all listed attributes must match. Other values throw an `InvalidIdentifyByException` (extends `InvalidArgumentException`). Since the location is derived from the IP address, combining `location` with `ip_address` adds nothing. Without a location resolver, `location` is always `null` and has no effect.
+Any combination of `location`, `ip_address` and `user_agent` is accepted; all listed attributes must match. Other values throw an `InvalidIdentifyByException` (extends `InvalidArgumentException`). Since the location is derived from the IP address, combining `location` with `ip_address` adds nothing. Using `location` without `DeviceCreator::resolveLocationUsing()` throws a `MissingLocationResolverException`, as every device would have a `null` location.
 
 With the `cookie` strategy:
 
 - The token is stored hashed (SHA-256) in the `device_token` column. The cookie is encrypted by Laravel's `EncryptCookies` middleware.
 - The location, IP address and user agent are still saved and updated with the latest values for display in notifications.
 - The cookie is sent when a new token is generated and renewed at most once a day, so `lifetime` counts from the device's last use. This requires the `AddQueuedCookiesToResponse` middleware (included in the `web` group).
-- Clients that don't send the cookie back (e.g. bots ignoring `Set-Cookie`) are matched by IP + user agent, so repeated attempts don't create a new device and notification each time.
+- Clients that don't send the cookie back (e.g. bots ignoring `Set-Cookie`) are matched by IP + user agent, so repeated attempts don't create a new device and notification each time. Their generated token never replaces the token of a device already identified by cookie.
 - Requests without a session (e.g. stateless APIs) can't keep the cookie, so they are matched by user agent among devices that have no token.
 - Devices saved before the `device_token` column existed are matched by IP + user agent once and then receive a token, so upgrading doesn't trigger a wave of notifications.
 
@@ -205,7 +205,7 @@ The package automatically saves user devices when auth events fire. No manual se
 - **Attempting**: Same as above. Finds user by email in credentials (when `events.attempting` is enabled).
 - **Failed**: Same as above. Uses user from event or resolves from credentials (when `events.failed` is enabled).
 
-All three events use `firstOrNew` by IP + user agent, so the same device is updated across requests.
+All three events match the device using the `identify_by` strategy, so the same device is updated across requests.
 
 To skip saving the device entirely for a request (e.g. in middleware or controller before authentication):
 
@@ -362,7 +362,7 @@ UserDevice::markAsBlocked(mixed $id): void
 UserDevice::markAsUnblocked(mixed $id): void
 
 // Scopes
-UserDevice::isBlocked(): bool // Any device matching the current request is blocked
+UserDevice::isBlocked(): bool // The device matching the current request is blocked
 ```
 
 #### HasUserDevices Trait

@@ -13,7 +13,7 @@ use Pijler\UserDevices\Notifications\FailedLoginNotification;
 trait HasUserDevices
 {
     /**
-     * Current request devices already resolved for this user, keyed by IP + user agent.
+     * Current request devices already resolved for this user, keyed by device identity.
      */
     private array $currentUserDevices = [];
 
@@ -52,14 +52,14 @@ trait HasUserDevices
     }
 
     /**
-     * Check if the current request's device (IP + user agent) is blocked for this user.
+     * Check if the current request's device is blocked for this user.
      * Use in login controller or FormRequest to prevent blocked devices from attempting login.
      */
     public function isCurrentDeviceBlocked(): bool
     {
         $context = DeviceContext::fromRequest();
 
-        if (blank($context->ipAddress) && blank($context->userAgent)) {
+        if (blank($context->deviceToken) && blank(array_filter($context->attributes()))) {
             return false;
         }
 
@@ -69,7 +69,10 @@ trait HasUserDevices
     }
 
     /**
-     * Resolve the current request's device (IP + user agent) for this user.
+     * Resolve the current request's device for this user.
+     *
+     * The device is matched according to the "identify_by" config option, and
+     * its location, IP address and user agent are refreshed with the current values.
      *
      * The result is memoized on the user instance so the blocked-device check
      * and last-activity update share a single SELECT per request.
@@ -78,15 +81,20 @@ trait HasUserDevices
     {
         $context = DeviceContext::fromRequest();
 
-        $cacheKey = "{$context->ipAddress}|{$context->userAgent}";
+        $cacheKey = json_encode([$context->identifyBy, $context->deviceToken, $context->attributes()]);
 
         if (array_key_exists($cacheKey, $this->currentUserDevices)) {
             return $this->currentUserDevices[$cacheKey];
         }
 
-        return $this->currentUserDevices[$cacheKey] = $this->userDevices()->firstOrNew([
-            'ip_address' => $context->ipAddress,
-            'user_agent' => $context->userAgent,
-        ]);
+        $device = $this->userDevices()->matchingContext($context)->first() ?? $this->userDevices()->make();
+
+        $device->fill($context->attributes());
+
+        if (filled($context->deviceToken)) {
+            $device->device_token = $context->deviceToken;
+        }
+
+        return $this->currentUserDevices[$cacheKey] = $device;
     }
 }

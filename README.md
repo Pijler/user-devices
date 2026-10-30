@@ -11,6 +11,7 @@ This package provides support for managing user devices in Laravel. Track login 
 ### 🧩 Features
 
 - ✅ **Device tracking**: Automatic tracking of IP address, user agent, location, and session ID
+- ✅ **Device identification**: Recognize devices by a long-lived cookie, user agent, or IP + user agent
 - ✅ **New login detection**: Identifies first-time logins from new devices
 - ✅ **Email notifications**: Sends alerts when a new device logs in, on login attempts, and on failed logins
 - ✅ **Configurable events**: Enable or disable listeners per auth event (authenticated, attempting, failed)
@@ -62,8 +63,35 @@ return [
         'authenticated' => true,   // Save device + send new login notification
     ],
     'credential_key' => 'email',   // Key to find user from credentials (attempting/failed)
+    'identify_by' => 'cookie',     // 'cookie' or a list of attributes, e.g. ['ip_address', 'user_agent']
+    'cookie' => [
+        'name' => 'user_device',   // Cookie that stores the device token
+        'lifetime' => 576000,      // Minutes (400 days), renewed on every request
+    ],
 ];
 ```
+
+#### Device Identification
+
+The `identify_by` option controls how a request is matched to a stored device:
+
+| Value | Matches by | Trade-offs |
+|---|---|---|
+| `'cookie'` (default) | A random token stored in a long-lived cookie | Recognizes the device across IP and browser updates. A login without the cookie (e.g. stolen credentials) is always a new device. Clearing cookies or private windows show up as new devices. |
+| `['user_agent']` | User agent only | Survives IP changes, but different devices with the same browser are treated as one, and the user agent is easy to spoof. |
+| `['location', 'user_agent']` | Location + user agent | Tolerates IP changes within the same location, while a login from elsewhere is a new device. Requires `DeviceCreator::resolveLocationUsing()`. |
+| `['ip_address', 'user_agent']` | IP address + user agent | Strictest match, but mobile networks, VPNs and Wi-Fi/4G switches create many "new device" alerts. |
+
+Any combination of `location`, `ip_address` and `user_agent` is accepted; all listed attributes must match. Other values throw an `InvalidArgumentException`. Since the location is derived from the IP address, combining `location` with `ip_address` adds nothing. Without a location resolver, `location` is always `null` and has no effect.
+
+With the `cookie` strategy:
+
+- The token is stored hashed (SHA-256) in the `device_token` column. The cookie is encrypted by Laravel's `EncryptCookies` middleware.
+- The location, IP address and user agent are still saved and updated with the latest values for display in notifications.
+- Requests without a session (e.g. stateless APIs) can't keep the cookie, so they fall back to `['user_agent']`.
+- Devices saved before the `device_token` column existed are matched by IP + user agent once and then receive a token, so upgrading doesn't trigger a wave of notifications.
+
+> **Note:** Blocking a device is a convenience, not a security boundary: any device identifier can be dropped or changed by the client. Blocking also invalidates the device session and the remember token; for compromised credentials, the user should change their password.
 
 #### DeviceCreator
 
@@ -324,6 +352,7 @@ UserDevice::markAsUnblocked(mixed $id): void
 ```php
 // Methods available on model
 $model->userDevices(): HasMany
+$model->currentDevice(): UserDevice     // Resolve the current request's device using the identify_by strategy
 $model->isCurrentDeviceBlocked(): bool  // Check if current request's device is blocked (use before login)
 $model->sendFailedLoginNotification(UserDevice $device): void
 $model->sendAttemptingLoginNotification(UserDevice $device): void

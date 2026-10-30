@@ -74,7 +74,6 @@ trait HandlesAuthEvents
 
         tap($device->exists, function ($exists) use ($user, $device, $context, $notify) {
             $device->fill([
-                'location' => $context->location,
                 'session_id' => $context->sessionId,
                 'last_activity' => Carbon::now()->timestamp,
             ])->save();

@@ -75,12 +75,12 @@ return [
 
 The `identify_by` option controls how a request is matched to a stored device:
 
-| Value | Matches by | Trade-offs |
-|---|---|---|
-| `'cookie'` (default) | A random token stored in a long-lived cookie | Recognizes the device across IP and browser updates. A login without the cookie (e.g. stolen credentials) is always a new device. Clearing cookies or private windows show up as new devices. |
-| `['user_agent']` | User agent only | Survives IP changes, but different devices with the same browser are treated as one, and the user agent is easy to spoof. |
-| `['location', 'user_agent']` | Location + user agent | Tolerates IP changes within the same location, while a login from elsewhere is a new device. Requires `DeviceCreator::resolveLocationUsing()`. |
-| `['ip_address', 'user_agent']` | IP address + user agent | Strictest match, but mobile networks, VPNs and Wi-Fi/4G switches create many "new device" alerts. |
+| Value                          | Matches by                                   | Trade-offs                                                                                                                                                                                    |
+| ------------------------------ | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'cookie'` (default)           | A random token stored in a long-lived cookie | Recognizes the device across IP and browser updates. A login without the cookie (e.g. stolen credentials) is always a new device. Clearing cookies or private windows show up as new devices. |
+| `['user_agent']`               | User agent only                              | Survives IP changes, but different devices with the same browser are treated as one, and the user agent is easy to spoof.                                                                     |
+| `['location', 'user_agent']`   | Location + user agent                        | Tolerates IP changes within the same location, while a login from elsewhere is a new device. Requires `DeviceCreator::resolveLocationUsing()`.                                                |
+| `['ip_address', 'user_agent']` | IP address + user agent                      | Strictest match, but mobile networks, VPNs and Wi-Fi/4G switches create many "new device" alerts.                                                                                             |
 
 Any combination of `location`, `ip_address` and `user_agent` is accepted; all listed attributes must match. Other values throw an `InvalidIdentifyByException` (extends `InvalidArgumentException`). Since the location is derived from the IP address, combining `location` with `ip_address` adds nothing. Without a location resolver, `location` is always `null` and has no effect.
 
@@ -266,7 +266,7 @@ Or in a FormRequest's `authorize` or custom validation:
 public function authorize(): bool
 {
     $user = User::where('email', $this->email)->first();
-    
+
     return ! ($user && $user->isCurrentDeviceBlocked());
 }
 ```

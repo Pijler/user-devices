@@ -2,16 +2,28 @@
 
 namespace Pijler\UserDevices\DTO;
 
+use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Session;
-use InvalidArgumentException;
 use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\Exceptions\InvalidIdentifyByException;
+use Pijler\UserDevices\Models\UserDevice;
 use Pijler\UserDevices\Services\DeviceTokenResolver;
 use Pijler\UserDevices\Services\LocationResolver;
+use WeakMap;
 
-readonly class DeviceContext
+class DeviceContext
 {
+    /**
+     * Contexts already resolved, keyed by request instance.
+     *
+     * Entries are dropped together with their request, so long-running
+     * processes (Octane, queue workers, tests) never share a context.
+     */
+    private static ?WeakMap $resolved = null;
+
     /**
      * The device attributes that can be used to identify a device.
      */
@@ -19,18 +31,24 @@ readonly class DeviceContext
         'location',
         'ip_address',
         'user_agent',
-        ];
+    ];
+
+    /**
+     * Devices already resolved for this context, keyed by user.
+     */
+    private array $devices = [];
 
     /**
      * Create a new DTO instance.
      */
     public function __construct(
-        public ?string $location = null,
-        public ?string $ipAddress = null,
-        public ?string $userAgent = null,
-        public ?string $sessionId = null,
-        public ?string $deviceToken = null,
-        public string|array $identifyBy = ['ip_address', 'user_agent'],
+        public readonly ?string $location = null,
+        public readonly ?string $ipAddress = null,
+        public readonly ?string $userAgent = null,
+        public readonly ?string $sessionId = null,
+        public readonly ?string $deviceToken = null,
+        public readonly bool $newDeviceToken = false,
+        public readonly string|array $identifyBy = 'cookie',
     ) {}
 
     /**
@@ -46,48 +64,95 @@ readonly class DeviceContext
     }
 
     /**
-     * Create from the current request.
+     * Create from the current request, resolving it only once per request.
      */
     public static function fromRequest(): self
     {
-        $ipAddress = Request::ip();
+        static::$resolved ??= new WeakMap;
 
-        $location = LocationResolver::resolve($ipAddress ?? '');
-
-        $sessionId = Request::hasSession() ? Session::getId() : null;
-
-        $userAgent = with(Request::userAgent(), DeviceCreator::$userAgent);
-
-        $identifyBy = static::resolveIdentifyBy();
-
-        $deviceToken = $identifyBy === 'cookie' ? DeviceTokenResolver::resolve() : null;
-
-        return new self($location, $ipAddress, $userAgent, $sessionId, $deviceToken, $identifyBy);
+        return static::$resolved[Request::instance()] ??= static::resolveFromRequest();
     }
 
     /**
-     * Resolve the device identification strategy for the current request.
+     * Remember the device resolved for the given user in this context.
+     */
+    public function rememberDevice(Model $user, Closure $resolve): UserDevice
+    {
+        $key = "{$user->getMorphClass()}.{$user->getKey()}";
+
+        return $this->devices[$key] ??= $resolve();
+    }
+
+    /**
+     * Get the hashed device token for the cookie strategy.
      *
-     * Requests without a session cannot keep the device cookie,
-     * so the cookie strategy falls back to the user agent.
+     * Requests without a session cannot keep the device cookie.
+     */
+    private static function getDeviceToken(string|array $identifyBy): ?string
+    {
+        if ($identifyBy === 'cookie' && Request::hasSession()) {
+            return DeviceTokenResolver::resolve();
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the device attributes from the current request.
+     */
+    private static function getAttributesFromRequest(): array
+    {
+        return [
+            'ip_address' => Request::ip(),
+            'location' => LocationResolver::resolve(Request::ip() ?? ''),
+            'session_id' => Request::hasSession() ? Session::getId() : null,
+            'user_agent' => with(Request::userAgent(), DeviceCreator::$userAgent),
+        ];
+    }
+
+    /**
+     * Resolve the context from the current request.
+     */
+    private static function resolveFromRequest(): self
+    {
+        $identifyBy = static::resolveIdentifyBy();
+
+        $deviceToken = static::getDeviceToken($identifyBy);
+
+        $newDeviceToken = filled($deviceToken) && DeviceTokenResolver::isGenerated();
+
+        [$ipAddress, $location, $sessionId, $userAgent] = array_values(static::getAttributesFromRequest());
+
+        return new self(
+            location: $location,
+            ipAddress: $ipAddress,
+            userAgent: $userAgent,
+            sessionId: $sessionId,
+            identifyBy: $identifyBy,
+            deviceToken: $deviceToken,
+            newDeviceToken: $newDeviceToken,
+        );
+    }
+
+    /**
+     * Resolve and validate the device identification strategy.
      */
     private static function resolveIdentifyBy(): string|array
     {
         $identifyBy = Config::get('user-devices.identify_by', 'cookie');
 
         if ($identifyBy === 'cookie') {
-            return Request::hasSession() ? 'cookie' : ['user_agent'];
+            return $identifyBy;
         }
 
-        $invalid = is_array($identifyBy) ? array_diff($identifyBy, self::IDENTIFIABLE_ATTRIBUTES) : [];
+        $attributes = collect(is_array($identifyBy) ? $identifyBy : []);
 
-        if (! is_array($identifyBy) || blank($identifyBy) || filled($invalid)) {
-            throw new InvalidArgumentException(sprintf(
-                'The [user-devices.identify_by] option must be "cookie" or a list of: %s.',
-                implode(', ', self::IDENTIFIABLE_ATTRIBUTES),
-            ));
-        }
+        $valid = $attributes->isNotEmpty() && $attributes->every(function (mixed $attribute) {
+            return in_array($attribute, self::IDENTIFIABLE_ATTRIBUTES, true);
+        });
 
-        return array_values($identifyBy);
+        throw_unless($valid, InvalidIdentifyByException::make());
+
+        return $attributes->values()->all();
     }
 }

@@ -119,3 +119,17 @@ test('it should keep current devices with dotted ips and user agents as distinct
     expect($first)->not->toBe($second);
     expect($user->currentDevice())->toBe($second);
 });
+
+test('it should keep the user serializable after resolving the current device', function () {
+    $user = User::factory()->create();
+
+    $user->currentDevice();
+
+    expect(unserialize(serialize($user))->is($user))->toBeTrue();
+});
+
+test('it should share the current device between instances of the same user', function () {
+    $user = User::factory()->create();
+
+    expect($user->currentDevice())->toBe(User::find($user->id)->currentDevice());
+});

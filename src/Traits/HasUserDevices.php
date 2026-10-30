@@ -13,11 +13,6 @@ use Pijler\UserDevices\Notifications\FailedLoginNotification;
 trait HasUserDevices
 {
     /**
-     * Current request devices already resolved for this user, keyed by device identity.
-     */
-    private array $currentUserDevices = [];
-
-    /**
      * Get the user devices that belong to the model.
      */
     public function userDevices(): HasMany
@@ -74,20 +69,22 @@ trait HasUserDevices
      * The device is matched according to the "identify_by" config option, and
      * its location, IP address and user agent are refreshed with the current values.
      *
-     * The result is memoized on the user instance so the blocked-device check
+     * The result is memoized on the request context so the blocked-device check
      * and last-activity update share a single SELECT per request.
      */
     public function currentDevice(): UserDevice
     {
         $context = DeviceContext::fromRequest();
 
-        $cacheKey = json_encode([$context->identifyBy, $context->deviceToken, $context->attributes()]);
+        return $context->rememberDevice($this, fn () => $this->resolveCurrentDevice($context));
+    }
 
-        if (array_key_exists($cacheKey, $this->currentUserDevices)) {
-            return $this->currentUserDevices[$cacheKey];
-        }
-
-        $device = $this->userDevices()->matchingContext($context)->first() ?? $this->userDevices()->make();
+    /**
+     * Find or make the device matching the given context.
+     */
+    private function resolveCurrentDevice(DeviceContext $context): UserDevice
+    {
+        $device = $this->userDevices()->matchingContext()->first() ?? $this->userDevices()->make();
 
         $device->fill($context->attributes());
 
@@ -95,6 +92,6 @@ trait HasUserDevices
             $device->device_token = $context->deviceToken;
         }
 
-        return $this->currentUserDevices[$cacheKey] = $device;
+        return $device;
     }
 }

@@ -1,12 +1,16 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
 use Pijler\UserDevices\DeviceCreator;
 use Pijler\UserDevices\DTO\DeviceContext;
+use Pijler\UserDevices\Exceptions\InvalidIdentifyByException;
 use Pijler\UserDevices\Notifications\AuthenticatedLoginNotification;
+use Pijler\UserDevices\Notifications\FailedLoginNotification;
 use Workbench\App\Models\User;
 use Workbench\App\Models\UserDevice;
 
@@ -24,6 +28,14 @@ function loginFrom(User $user, string $ip, string $userAgent, ?string $cookie = 
         'email' => $user->email,
         'password' => 'password',
     ], ['User-Agent' => $userAgent]);
+}
+
+function useRequest(string $userAgent): void
+{
+    $request = Request::create('/', 'GET', [], [], [], ['HTTP_USER_AGENT' => $userAgent]);
+
+    Facade::clearResolvedInstance('request');
+    app()->instance('request', $request);
 }
 
 test('it should recognize the device by cookie even when ip and user agent change', function () {
@@ -47,7 +59,7 @@ test('it should recognize the device by cookie even when ip and user agent chang
     Notification::assertSentToTimes($user, AuthenticatedLoginNotification::class, 1);
 });
 
-test('it should treat a request without the cookie as a new device even with the same ip and user agent', function () {
+test('it should treat a request without the cookie as a new device even with the same user agent', function () {
     Notification::fake();
 
     $user = User::factory()->create(['password' => 'password']);
@@ -59,7 +71,7 @@ test('it should treat a request without the cookie as a new device even with the
         'device_token' => hash('sha256', 'known-token'),
     ]);
 
-    loginFrom($user, '10.0.0.1', 'Mozilla/5.0 Common Browser');
+    loginFrom($user, '10.0.0.2', 'Mozilla/5.0 Common Browser');
 
     expect($user->userDevices()->count())->toBe(2);
 
@@ -131,11 +143,85 @@ test('it should match by ip and user agent when configured', function () {
     Notification::assertSentToTimes($user, AuthenticatedLoginNotification::class, 2);
 });
 
-test('it should fall back to user agent when the request has no session', function () {
+test('it should not resolve a device token when the request has no session', function () {
     $context = DeviceContext::fromRequest();
 
-    expect($context->identifyBy)->toBe(['user_agent']);
+    expect($context->identifyBy)->toBe('cookie');
     expect($context->deviceToken)->toBeNull();
+});
+
+test('it should only match untokened devices by user agent when the request has no session', function () {
+    $user = User::factory()->create();
+
+    $tokened = UserDevice::factory()->create([
+        'user_id' => $user->id,
+        'user_agent' => 'Mozilla/5.0 Shared Agent',
+        'device_token' => hash('sha256', 'laptop-token'),
+    ]);
+
+    useRequest('Mozilla/5.0 Shared Agent');
+
+    expect($user->currentDevice()->exists)->toBeFalse();
+
+    $untokened = UserDevice::factory()->create([
+        'user_id' => $user->id,
+        'user_agent' => 'Mozilla/5.0 Shared Agent',
+    ]);
+
+    useRequest('Mozilla/5.0 Shared Agent');
+
+    expect($user->currentDevice()->is($untokened))->toBeTrue();
+    expect($tokened->fresh()->device_token)->toBe(hash('sha256', 'laptop-token'));
+});
+
+test('it should group repeated failed logins from a client without cookies into one device', function () {
+    Notification::fake();
+
+    $user = User::factory()->create(['password' => 'password']);
+
+    foreach (range(1, 3) as $attempt) {
+        Auth::forgetGuards();
+
+        $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'wrong',
+        ], ['User-Agent' => 'Mozilla/5.0 Cookieless Bot']);
+    }
+
+    expect($user->userDevices()->count())->toBe(1);
+
+    Notification::assertSentToTimes($user, FailedLoginNotification::class, 1);
+});
+
+test('it should not queue the device cookie on read-only blocked checks', function () {
+    $user = User::factory()->create();
+
+    $response = $this->get('/test/current-device-blocked?email='.urlencode($user->email));
+
+    expect($response->getCookie('user_device'))->toBeNull();
+});
+
+test('it should prefer a blocked device when several devices match', function () {
+    Config::set('user-devices.identify_by', ['user_agent']);
+
+    $user = User::factory()->create();
+
+    UserDevice::factory()->blocked()->create([
+        'user_id' => $user->id,
+        'user_agent' => 'Mozilla/5.0 Duplicated',
+        'last_activity' => now()->subDay()->timestamp,
+    ]);
+
+    UserDevice::factory()->create([
+        'user_id' => $user->id,
+        'user_agent' => 'Mozilla/5.0 Duplicated',
+        'last_activity' => now()->timestamp,
+    ]);
+
+    useRequest('Mozilla/5.0 Duplicated');
+
+    expect($user->currentDevice()->blocked)->toBeTrue();
+    expect(UserDevice::where('user_id', $user->id)->isBlocked())->toBeTrue();
 });
 
 test('it should match by location and user agent when configured', function () {
@@ -166,16 +252,60 @@ test('it should throw when identify_by has an invalid attribute', function () {
     Config::set('user-devices.identify_by', ['blocked']);
 
     DeviceContext::fromRequest();
-})->throws(InvalidArgumentException::class);
+})->throws(InvalidIdentifyByException::class);
 
 test('it should throw when identify_by is an empty array', function () {
     Config::set('user-devices.identify_by', []);
 
     DeviceContext::fromRequest();
-})->throws(InvalidArgumentException::class);
+})->throws(InvalidIdentifyByException::class);
 
 test('it should throw when identify_by is an unknown string', function () {
     Config::set('user-devices.identify_by', 'user_agent');
 
     DeviceContext::fromRequest();
-})->throws(InvalidArgumentException::class);
+})->throws(InvalidIdentifyByException::class);
+
+test('it should throw when identify_by has a nested array', function () {
+    Config::set('user-devices.identify_by', [['ip_address']]);
+
+    DeviceContext::fromRequest();
+})->throws(InvalidIdentifyByException::class);
+
+test('it should not resend the device cookie when the device was used recently', function () {
+    $user = User::factory()->create(['password' => 'password']);
+
+    UserDevice::factory()->create([
+        'user_id' => $user->id,
+        'last_activity' => now()->subHour()->timestamp,
+        'device_token' => hash('sha256', 'recent-token'),
+    ]);
+
+    $response = loginFrom($user, '10.0.0.1', 'Mozilla/5.0 Recent', 'recent-token');
+
+    expect($response->getCookie('user_device'))->toBeNull();
+});
+
+test('it should renew the device cookie once the last use is older than a day', function () {
+    $user = User::factory()->create(['password' => 'password']);
+
+    UserDevice::factory()->create([
+        'user_id' => $user->id,
+        'last_activity' => now()->subDays(2)->timestamp,
+        'device_token' => hash('sha256', 'stale-token'),
+    ]);
+
+    $response = loginFrom($user, '10.0.0.1', 'Mozilla/5.0 Stale', 'stale-token');
+
+    expect($response->getCookie('user_device')->getValue())->toBe('stale-token');
+});
+
+test('it should not send the device cookie when identifying by attributes', function () {
+    Config::set('user-devices.identify_by', ['user_agent']);
+
+    $user = User::factory()->create(['password' => 'password']);
+
+    $response = loginFrom($user, '10.0.0.1', 'Mozilla/5.0 Attributes');
+
+    expect($response->getCookie('user_device'))->toBeNull();
+});

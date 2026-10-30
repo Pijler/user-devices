@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Context;
 use Pijler\UserDevices\DeviceCreator;
 use Pijler\UserDevices\DTO\DeviceContext;
 use Pijler\UserDevices\Models\UserDevice;
+use Pijler\UserDevices\Services\DeviceTokenResolver;
 
 trait HandlesAuthEvents
 {
@@ -68,9 +69,9 @@ trait HandlesAuthEvents
      */
     protected function createOrUpdateDeviceAndNotifyIfNew(mixed $user, callable $notify): void
     {
-        $context = DeviceContext::fromRequest();
-
         $device = $user->currentDevice();
+
+        $context = DeviceContext::fromRequest();
 
         tap($device->exists, function ($exists) use ($user, $device, $context, $notify) {
             $device->fill([
@@ -78,9 +79,28 @@ trait HandlesAuthEvents
                 'last_activity' => Carbon::now()->timestamp,
             ])->save();
 
+            if ($this->shouldQueueDeviceCookie($context, $device)) {
+                DeviceTokenResolver::queue();
+            }
+
             if (! $exists && $this->shouldSendNotification($user, $device)) {
                 $notify($user, $device);
             }
         });
+    }
+
+    /**
+     * Determine whether the device cookie should be sent.
+     *
+     * The cookie is sent when its token is new, and renewed at most once a day
+     * so the lifetime counts from the device's last use instead of its creation.
+     */
+    protected function shouldQueueDeviceCookie(DeviceContext $context, UserDevice $device): bool
+    {
+        if (blank($context->deviceToken)) {
+            return false;
+        }
+
+        return $context->newDeviceToken || $device->last_activity < Carbon::now()->subDay()->timestamp;
     }
 }

@@ -10,28 +10,66 @@ use Illuminate\Support\Str;
 class DeviceTokenResolver
 {
     /**
+     * The request attribute flagging a token generated during this request.
+     */
+    private const GENERATED_ATTRIBUTE = 'user_devices.generated_device_token';
+
+    /**
      * Resolve the hashed device token from the device cookie.
      *
-     * A new token is generated when the cookie is missing. The cookie is queued
-     * on every call so its lifetime is renewed while the device stays active.
+     * A new token is generated when the cookie is missing and shared
+     * with later lookups in this same request.
      */
     public static function resolve(): string
     {
         $request = Request::instance();
 
-        $name = Config::get('user-devices.cookie.name', 'user_device');
-
-        $token = $request->cookies->get($name);
+        $token = $request->cookies->get(static::cookieName());
 
         if (! is_string($token) || blank($token)) {
             $token = Str::random(40);
 
-            // Share the token with later lookups in this same request
-            $request->cookies->set($name, $token);
+            $request->cookies->set(static::cookieName(), $token);
+
+            $request->attributes->set(self::GENERATED_ATTRIBUTE, true);
         }
 
-        Cookie::queue($name, $token, (int) Config::get('user-devices.cookie.lifetime', 576000));
-
         return hash('sha256', $token);
+    }
+
+    /**
+     * Determine whether the device token was generated during this request.
+     */
+    public static function isGenerated(): bool
+    {
+        return Request::instance()->attributes->get(self::GENERATED_ATTRIBUTE, false);
+    }
+
+    /**
+     * Queue the device cookie, renewing its lifetime.
+     *
+     * Requires the AddQueuedCookiesToResponse middleware (included in the "web" group).
+     */
+    public static function queue(): void
+    {
+        $token = Request::instance()->cookies->get(static::cookieName());
+
+        if (! is_string($token) || blank($token)) {
+            return;
+        }
+
+        Cookie::queue(Cookie::make(
+            value: $token,
+            name: static::cookieName(),
+            minutes: (int) Config::get('user-devices.cookie.lifetime', 259200),
+        ));
+    }
+
+    /**
+     * Get the device cookie name.
+     */
+    private static function cookieName(): string
+    {
+        return Config::get('user-devices.cookie.name', 'user_device');
     }
 }

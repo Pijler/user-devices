@@ -36,14 +36,15 @@ return [
     |--------------------------------------------------------------------------
     |
     | The cookie used by the "cookie" identification strategy. The lifetime is
-    | in minutes and is renewed on every request. Browsers cap cookies at 400 days.
+    | in minutes and renewed at most once a day, so it counts from the device's
+    | last use. Browsers cap cookies at 400 days.
     |
     */
 
     'cookie' => [
-        'name' => 'user_device',
+        'lifetime' => 259200,
 
-        'lifetime' => 576000,
+        'name' => 'user_device',
     ],
 
     /*

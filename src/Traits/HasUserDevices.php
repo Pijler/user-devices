@@ -13,11 +13,6 @@ use Pijler\UserDevices\Notifications\FailedLoginNotification;
 trait HasUserDevices
 {
     /**
-     * Current request devices already resolved for this user, keyed by IP + user agent.
-     */
-    private array $currentUserDevices = [];
-
-    /**
      * Get the user devices that belong to the model.
      */
     public function userDevices(): HasMany
@@ -52,14 +47,14 @@ trait HasUserDevices
     }
 
     /**
-     * Check if the current request's device (IP + user agent) is blocked for this user.
+     * Check if the current request's device is blocked for this user.
      * Use in login controller or FormRequest to prevent blocked devices from attempting login.
      */
     public function isCurrentDeviceBlocked(): bool
     {
         $context = DeviceContext::fromRequest();
 
-        if (blank($context->ipAddress) && blank($context->userAgent)) {
+        if (blank($context->deviceToken) && blank(array_filter($context->attributes()))) {
             return false;
         }
 
@@ -69,24 +64,36 @@ trait HasUserDevices
     }
 
     /**
-     * Resolve the current request's device (IP + user agent) for this user.
+     * Resolve the current request's device for this user.
      *
-     * The result is memoized on the user instance so the blocked-device check
+     * The device is matched according to the "identify_by" config option, and
+     * its location, IP address and user agent are refreshed with the current values.
+     *
+     * The result is memoized on the request context so the blocked-device check
      * and last-activity update share a single SELECT per request.
      */
     public function currentDevice(): UserDevice
     {
         $context = DeviceContext::fromRequest();
 
-        $cacheKey = "{$context->ipAddress}|{$context->userAgent}";
+        return $context->rememberDevice($this, fn () => $this->resolveCurrentDevice($context));
+    }
 
-        if (array_key_exists($cacheKey, $this->currentUserDevices)) {
-            return $this->currentUserDevices[$cacheKey];
+    /**
+     * Find or make the device matching the given context.
+     */
+    private function resolveCurrentDevice(DeviceContext $context): UserDevice
+    {
+        $device = $this->userDevices()->matchingContext()->first() ?? $this->userDevices()->make();
+
+        $device->fill($context->attributes());
+
+        $keepsToken = $context->newDeviceToken && filled($device->device_token);
+
+        if (filled($context->deviceToken) && ! $keepsToken) {
+            $device->device_token = $context->deviceToken;
         }
 
-        return $this->currentUserDevices[$cacheKey] = $this->userDevices()->firstOrNew([
-            'ip_address' => $context->ipAddress,
-            'user_agent' => $context->userAgent,
-        ]);
+        return $device;
     }
 }

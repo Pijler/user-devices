@@ -48,12 +48,12 @@ test('it should not send failed login notification for existing device', functio
 
     $user = User::factory()->create(['password' => 'password']);
 
-    $this->post('/login', [
+    $response = $this->post('/login', [
         'email' => $user->email,
         'password' => 'wrong',
     ], ['User-Agent' => 'Mozilla/5.0 Repeated Failed Device']);
 
-    $this->post('/login', [
+    $this->withCookie('user_device', $response->getCookie('user_device')->getValue())->post('/login', [
         'email' => $user->email,
         'password' => 'wrong',
     ], ['User-Agent' => 'Mozilla/5.0 Repeated Failed Device']);

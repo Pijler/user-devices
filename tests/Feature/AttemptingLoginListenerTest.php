@@ -49,12 +49,12 @@ test('it should not send attempting login notification for existing device', fun
 
     $user = User::factory()->create(['password' => 'password']);
 
-    $this->post('/login', [
+    $response = $this->post('/login', [
         'email' => $user->email,
         'password' => 'wrong-password',
     ], ['User-Agent' => 'Mozilla/5.0 Same Device']);
 
-    $this->post('/login', [
+    $this->withCookie('user_device', $response->getCookie('user_device')->getValue())->post('/login', [
         'email' => $user->email,
         'password' => 'wrong-password',
     ], ['User-Agent' => 'Mozilla/5.0 Same Device']);

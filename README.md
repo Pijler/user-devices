@@ -11,6 +11,7 @@ This package provides support for managing user devices in Laravel. Track login 
 ### 🧩 Features
 
 - ✅ **Device tracking**: Automatic tracking of IP address, user agent, location, and session ID
+- ✅ **Device identification**: Recognize devices by a long-lived cookie, user agent, or IP + user agent
 - ✅ **New login detection**: Identifies first-time logins from new devices
 - ✅ **Email notifications**: Sends alerts when a new device logs in, on login attempts, and on failed logins
 - ✅ **Configurable events**: Enable or disable listeners per auth event (authenticated, attempting, failed)
@@ -62,8 +63,37 @@ return [
         'authenticated' => true,   // Save device + send new login notification
     ],
     'credential_key' => 'email',   // Key to find user from credentials (attempting/failed)
+    'identify_by' => 'cookie',     // 'cookie' or a list of attributes, e.g. ['ip_address', 'user_agent']
+    'cookie' => [
+        'name' => 'user_device',   // Cookie that stores the device token
+        'lifetime' => 259200,      // Minutes (180 days)
+    ],
 ];
 ```
+
+#### Device Identification
+
+The `identify_by` option controls how a request is matched to a stored device:
+
+| Value                          | Matches by                                   | Trade-offs                                                                                                                                                                                    |
+| ------------------------------ | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'cookie'` (default)           | A random token stored in a long-lived cookie | Recognizes the device across IP and browser updates. A login without the cookie (e.g. stolen credentials) is always a new device. Clearing cookies or private windows show up as new devices. |
+| `['user_agent']`               | User agent only                              | Survives IP changes, but different devices with the same browser are treated as one, and the user agent is easy to spoof.                                                                     |
+| `['location', 'user_agent']`   | Location + user agent                        | Tolerates IP changes within the same location, while a login from elsewhere is a new device. Requires `DeviceCreator::resolveLocationUsing()`.                                                |
+| `['ip_address', 'user_agent']` | IP address + user agent                      | Strictest match, but mobile networks, VPNs and Wi-Fi/4G switches create many "new device" alerts.                                                                                             |
+
+Any combination of `location`, `ip_address` and `user_agent` is accepted; all listed attributes must match. Other values throw an `InvalidIdentifyByException` (extends `InvalidArgumentException`). Since the location is derived from the IP address, combining `location` with `ip_address` adds nothing. Using `location` without `DeviceCreator::resolveLocationUsing()` throws a `MissingLocationResolverException`, as every device would have a `null` location.
+
+With the `cookie` strategy:
+
+- The token is stored hashed (SHA-256) in the `device_token` column. The cookie is encrypted by Laravel's `EncryptCookies` middleware.
+- The location, IP address and user agent are still saved and updated with the latest values for display in notifications.
+- The cookie is sent when a new token is generated and renewed at most once a day, so `lifetime` counts from the device's last use. This requires the `AddQueuedCookiesToResponse` middleware (included in the `web` group).
+- Clients that don't send the cookie back (e.g. bots ignoring `Set-Cookie`) are matched by IP + user agent, so repeated attempts don't create a new device and notification each time. Their generated token never replaces the token of a device already identified by cookie.
+- Requests without a session (e.g. stateless APIs) can't keep the cookie, so they are matched by user agent among devices that have no token.
+- Devices saved before the `device_token` column existed are matched by IP + user agent once and then receive a token, so upgrading doesn't trigger a wave of notifications.
+
+> **Note:** Blocking a device is a convenience, not a security boundary: any device identifier can be dropped or changed by the client. Blocking also invalidates the device session and the remember token; for compromised credentials, the user should change their password.
 
 #### DeviceCreator
 
@@ -137,6 +167,19 @@ class AppServiceProvider extends ServiceProvider
 
 The block link expiration uses `auth.verification.expire` (default 60 minutes), same as Laravel's email verification.
 
+### ⬆️ Upgrading
+
+The `identify_by` option defaults to `cookie`, which uses the new `device_token` column. Existing applications must publish and run the new migration before deploying this version:
+
+```bash
+php artisan vendor:publish --tag=user-devices-migrations
+php artisan migrate
+```
+
+To keep the previous behavior, set `'identify_by' => ['ip_address', 'user_agent']`.
+
+The `UserDevice::isBlocked()` scope no longer receives an IP address and user agent: it checks the devices matching the current request, following `identify_by`.
+
 ### 🧠 Usage
 
 #### 1. Using the HasUserDevices Trait
@@ -162,7 +205,7 @@ The package automatically saves user devices when auth events fire. No manual se
 - **Attempting**: Same as above. Finds user by email in credentials (when `events.attempting` is enabled).
 - **Failed**: Same as above. Uses user from event or resolves from credentials (when `events.failed` is enabled).
 
-All three events use `firstOrNew` by IP + user agent, so the same device is updated across requests.
+All three events match the device using the `identify_by` strategy, so the same device is updated across requests.
 
 To skip saving the device entirely for a request (e.g. in middleware or controller before authentication):
 
@@ -223,7 +266,7 @@ Or in a FormRequest's `authorize` or custom validation:
 public function authorize(): bool
 {
     $user = User::where('email', $this->email)->first();
-    
+
     return ! ($user && $user->isCurrentDeviceBlocked());
 }
 ```
@@ -317,6 +360,9 @@ $device->unblock(): void
 // Static methods
 UserDevice::markAsBlocked(mixed $id): void
 UserDevice::markAsUnblocked(mixed $id): void
+
+// Scopes
+UserDevice::isBlocked(): bool // The device matching the current request is blocked
 ```
 
 #### HasUserDevices Trait
@@ -324,6 +370,7 @@ UserDevice::markAsUnblocked(mixed $id): void
 ```php
 // Methods available on model
 $model->userDevices(): HasMany
+$model->currentDevice(): UserDevice     // Resolve the current request's device using the identify_by strategy
 $model->isCurrentDeviceBlocked(): bool  // Check if current request's device is blocked (use before login)
 $model->sendFailedLoginNotification(UserDevice $device): void
 $model->sendAttemptingLoginNotification(UserDevice $device): void

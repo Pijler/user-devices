@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Pijler\UserDevices\DeviceCreator;
+use Pijler\UserDevices\DTO\DeviceContext;
 
 class UserDevice extends Model
 {
@@ -72,15 +73,50 @@ class UserDevice extends Model
     }
 
     /**
-     * Scope a query to check if the device is blocked.
+     * Scope a query to check if the device matching the current request is blocked.
      */
     #[Scope]
-    protected function isBlocked(Builder $query, mixed $ipAddress = null, mixed $userAgent = null): bool
+    protected function isBlocked(Builder $query): bool
     {
-        return $query->when(filled($ipAddress), function (Builder $query) use ($ipAddress) {
-            $query->where('ip_address', $ipAddress);
-        })->when(filled($userAgent), function (Builder $query) use ($userAgent) {
-            $query->where('user_agent', $userAgent);
-        })->where('blocked', true)->exists();
+        return (bool) $query->matchingContext()->value('blocked');
+    }
+
+    /**
+     * Scope a query to the devices matching the current request's context.
+     *
+     * The cookie strategy matches by device token. Without a stored token match:
+     * - a cookie sent by the client only adopts legacy devices (no token) by IP + user agent;
+     * - a token generated in this request (client without cookie) matches by IP + user agent,
+     *   so clients that never keep the cookie don't create a new device on every request;
+     * - a request without a session can't keep the cookie, so it matches untokened devices by user agent.
+     *
+     * A device matched by token comes first, as it's the most reliable identification.
+     * Among the remaining matches, blocked devices come first so they are never hidden.
+     */
+    #[Scope]
+    protected function matchingContext(Builder $query): void
+    {
+        $context = DeviceContext::fromRequest();
+
+        $usesCookie = $context->identifyBy === 'cookie';
+
+        $query->when(! $usesCookie, function (Builder $query) use ($context) {
+            foreach ($context->identifyBy as $attribute) {
+                $query->where($attribute, data_get($context->attributes(), $attribute));
+            }
+        })->when($usesCookie && blank($context->deviceToken), function (Builder $query) use ($context) {
+            $query
+                ->whereNull('device_token')
+                ->where('user_agent', $context->userAgent);
+        })->when($usesCookie && filled($context->deviceToken), function (Builder $query) use ($context) {
+            $query->where(function (Builder $query) use ($context) {
+                $query->where('device_token', $context->deviceToken)->orWhere(function (Builder $query) use ($context) {
+                    $query
+                        ->where('ip_address', $context->ipAddress)
+                        ->where('user_agent', $context->userAgent)
+                        ->when(! $context->newDeviceToken, fn (Builder $query) => $query->whereNull('device_token'));
+                });
+            })->orderByRaw('case when device_token = ? then 0 else 1 end', [$context->deviceToken]);
+        })->orderByDesc('blocked')->latest('last_activity');
     }
 }
